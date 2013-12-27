@@ -123,6 +123,7 @@ cdef inline list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=
     #cdef list max_peaks=[]
     cdef list min_peaks = []
     cdef list dump = [] # used to pop the first hit which almost always is false
+    cdef list y_axis_list = y_axis.tolist() # convert array to list, min() is faster for list
 
     # check input data --> this makes the algorithm 5 times slower
     #x_axis, y_axis = _datacheck_peakdetect(x_axis, y_axis) 
@@ -157,7 +158,7 @@ cdef inline list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=
         if y < mx-delta and mx != 1000:
             #Maxima peak candidate found
             # lool ahead in signal to ensure that this is a peak and not jitter
-            if y_axis[index:index+lookahead_max].max() < mx:
+            if max(y_axis_list[index:index+lookahead_max]) < mx:
                 #max_peaks.append([mxpos, mx])
                 dump.append(True)
                 #set algorithm to only find minima now
@@ -174,7 +175,7 @@ cdef inline list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=
         if y > mn+delta and mn != -1000:
             #Minima peak candidate found
             # look ahead in signal to ensure that this is a peak and not jitter
-            if y_axis[index:index+lookahead_min].min() > mn:
+            if min(y_axis_list[index:index+lookahead_min]) > mn:
                 min_peaks.append(mnpos)
                 dump.append(False)
                 #set algorithm to only find maximum now

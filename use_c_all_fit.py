@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 if len(word)<6 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minimas which are in the wave-range + lookahead_min
                     wave_block.append(float(word))
         if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
-            sim_waves.append([thickness,len(wave_block),position]) # calculate length of the waveblock since it will be needed later
+            sim_waves.append([int(thickness),len(wave_block),position]) # calculate length of the waveblock since it will be needed later
             s_waves_arrays.append(np.array(wave_block,dtype=np.float))
             position += len(wave_block)
             wave_block=[]

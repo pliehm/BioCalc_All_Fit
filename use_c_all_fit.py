@@ -5,24 +5,25 @@ import os
 import Image as im
 import multiprocessing as mp
 import matplotlib.pyplot as plt
+t_a_start = time.time()
 
 if __name__ == '__main__':
 
     # enter number of cpu cores, this has to be an integer number!
     # you should enter the number of physical cores, since a larger number will slow down the calculations
 
-    cores=4
+    cores=8
     
     # enter folder with data
 
-    folder = '40x_500ms' 
+    folder = '150nN' 
 
     # enter name of simulation_file
 
     sim_file = 'Sim_0.5Cr_20Au_Elastomer_RT601_15Au_500_750nm.txt'
 
     # enter average deviation of experiment to simulation in nanometer
-    tolerance=1
+    tolerance=2
 
     # define parameters for peakdetection  
     lookahead_min = 5 # something like peak width for thr minima
@@ -32,13 +33,13 @@ if __name__ == '__main__':
     # chose wavelength range and step-width
 
     wave_start = 550
-    wave_end = 750
+    wave_end = 740
     wave_step = 1
 
     # chose elastomer thickness range
 
-    d_min= 6000    
-    d_max= 9000
+    d_min= 2000    
+    d_max= 5000
 
     # make wavelength list
 
@@ -99,7 +100,7 @@ if __name__ == '__main__':
                 if len(word)<6 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minimas which are in the wave-range + lookahead_min
                     wave_block.append(float(word))
         if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
-            sim_waves.append([int(thickness),len(wave_block),position]) # calculate length of the waveblock since it will be needed later
+            sim_waves.append([np.uint16(thickness),np.uint16(len(wave_block)),np.uint16(position)]) # calculate length of the waveblock since it will be needed later
             s_waves_arrays.append(np.array(wave_block,dtype=np.float))
             position += len(wave_block)
             wave_block=[]
@@ -173,6 +174,6 @@ if __name__ == '__main__':
     p.close()
 
     plt.figure(1)
-    plt.show()
-
+    #plt.show()
+print (time.time()-t_a_start), ' seconds'
 

@@ -16,14 +16,14 @@ if __name__ == '__main__':
     
     # enter folder with data
 
-    folder = '150nN' 
+    folder = '40x_500ms' 
 
     # enter name of simulation_file
 
     sim_file = 'Sim_0.5Cr_20Au_Elastomer_RT601_15Au_500_750nm.txt'
 
     # enter average deviation of experiment to simulation in nanometer
-    tolerance=2
+    tolerance=1
 
     # define parameters for peakdetection  
     lookahead_min = 5 # something like peak width for thr minima
@@ -33,13 +33,13 @@ if __name__ == '__main__':
     # chose wavelength range and step-width
 
     wave_start = 550
-    wave_end = 740
+    wave_end = 750
     wave_step = 1
 
     # chose elastomer thickness range
 
-    d_min= 2000    
-    d_max= 5000
+    d_min= 6000   
+    d_max= 9000
 
     # make wavelength list
 
@@ -161,19 +161,24 @@ if __name__ == '__main__':
 
     # write data into file, with timestamp and all parameters
 
-    p = open(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt','w') 
-    p.write(time.strftime("%d.%m.%Y at %H:%M:%S")+'\n')
-    p.write('folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n')
-    for i in range(len(dicke)):
-        for k in range(len(dicke[0])):
-            if dicke[i][k] > 0:
-                p.write(str(dicke[i][k])+' ')
-            else:
-                p.write('-' + ' ')
-        p.write('\n')
-    p.close()
+    # p = open(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt','w') 
+    # p.write(time.strftime("%d.%m.%Y at %H:%M:%S")+'\n')
+    # p.write('folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n')
+    # for i in xrange(len(dicke)):
+    #     for k in xrange(len(dicke[0])):
+    #         if dicke[i][k] > 0:
+    #             p.write(str(dicke[i][k])+' ')
+    #         else:
+    #             p.write('-' + ' ')
+    #     p.write('\n')
+    # p.close()
 
-    plt.figure(1)
-    #plt.show()
+    # use numpy function to save array to file, '0' and not '-' used for missing values
+    HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
+    np.savetxt(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt',dicke,fmt='%d',header=HEADER )
+
 print (time.time()-t_a_start), ' seconds'
+    #plt.figure(1)
+    #plt.show()
+
 

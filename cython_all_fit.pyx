@@ -131,8 +131,8 @@ cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] arr
 
     if L_exp_waves > 2: # first test if there are more than two minima
        # for waves in s_waves_arrays:
-        min_thickness_i = thickness[current_index-50] #thickness_list.index(current_thickness-10)
-        max_thickness_i = thickness[current_index+50] #thickness_list.index(current_thickness+10)
+        min_thickness_i = thickness[current_index-100] #thickness_list.index(current_thickness-10)
+        max_thickness_i = thickness[current_index+100] #thickness_list.index(current_thickness+10)
         for i in range(min_thickness_i,max_thickness_i): # do the following calculations for every simulated thickness
             position = array_thickness_pos[i]
             len_block = array_length_block[i]
@@ -341,7 +341,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
             if current_thickness == 0:
                 current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,current_thickness, current_index,thickness_list))
                 thickness_ready[zeile-start][spalte] = current_thickness
-            # current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,current_thickness,thickness_list))
+            # current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,current_thickness,current_index,thickness_list))
             # thickness_ready[zeile-start][spalte] = current_thickness    
             # current_thickness = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array))
             # thickness_ready[zeile-start][spalte] = current_thickness

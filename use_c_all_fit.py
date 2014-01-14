@@ -1,3 +1,48 @@
+##############################################################################
+### Script to calculate the cavity thicknes of a Biosensor for every pixel ###
+##############################################################################
+
+#############
+### INPUT ###
+#############
+
+
+# enter folder with data, no subfolders allowed
+folder = '50nN' 
+
+
+# chose wavelength range and step-width
+
+wave_start = 550    # [nm]
+wave_end = 750      # [nm]
+wave_step = 1       # [nm]
+
+# enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
+tolerance=1.5
+
+# define parameters for minima detection  
+lookahead_min = 5 # something like peak width for the minima
+delta = 7    # something like peak height
+
+# chose elastomer thickness range , tha smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
+
+d_min= 1000   # [nm]
+d_max= 19000 # [nm]
+
+use_thickness_limits = False # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
+thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
+
+
+############################
+### END of INPUT SECTION ###
+############################
+
+
+
+#############################
+#### start of the program ###
+#############################
+
 import cython_all_fit as Fit # import self-written cython code
 import numpy as np
 import time
@@ -5,41 +50,21 @@ import os
 import Image as im
 import multiprocessing as mp
 import matplotlib.pyplot as plt
-t_a_start = time.time()
+
+t_a_start = time.time() # start timer for runtime measurement
 
 if __name__ == '__main__':
 
     # enter number of cpu cores, this has to be an integer number!
-    # you should enter the number of physical cores, since a larger number will slow down the calculations
+    # number of physical cores is a good start, but you can try with a larger as well
 
-    cores=8
+    cores=4
     
-    # enter folder with data
-
-    folder = '40x_500ms' 
-
     # enter name of simulation_file
 
     sim_file = 'Sim_0.5Cr_20Au_Elastomer_RT601_15Au_500_750nm.txt'
 
-    # enter average deviation of experiment to simulation in nanometer
-    tolerance=1
-
-    # define parameters for peakdetection  
-    lookahead_min = 5 # something like peak width for thr minima
-    lookahead_max = 4 # for the maxima --> should not be larger than lookahead_min
-    delta = 7    # something like peak height
-
-    # chose wavelength range and step-width
-
-    wave_start = 550
-    wave_end = 750
-    wave_step = 1
-
-    # chose elastomer thickness range
-
-    d_min= 6000   
-    d_max= 9000
+    lookahead_max = lookahead_min-1 # for the maxima --> should not be larger than lookahead_min
 
     # make wavelength list
 
@@ -65,20 +90,21 @@ if __name__ == '__main__':
     # write grey values into array
     
     counter=0
+    print 'reading images from folder: ', folder
     for i in xrange(len(dateien)):
         if dateien[i][-5:]=='.tiff':
             if int(dateien[i][:3]) >= wave_start and int(dateien[i][:3]) <= wave_end:
-                print dateien[i]
-                print counter
+                #print dateien[i]
+                #print counter
                 Img=im.open(folder + '/' + dateien[i]).convert('L')
                 alle[counter]=image2array(Img)
                 counter+= 1
 
 
     # read simulation file 
+    print 'read simulated data'
 
     p= open(sim_file,'r')
-
 
     string=p.read()
 
@@ -105,11 +131,12 @@ if __name__ == '__main__':
             position += len(wave_block)
             wave_block=[]
 
+    print 'perform the calculations'
     # define queue for the multiprocessing
-    def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta):
+    def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit):
 
-        que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays)) # calls the C-Fit-function
-        print 'Schlange ist satt'
+        que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
+        #print 'Schlange ist satt'
 
     t1 = time.time()
     
@@ -127,9 +154,9 @@ if __name__ == '__main__':
 
     for i in range(cores):
         if i < cores-1:
-            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta)))
+            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
         if i == cores-1:
-            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta)))
+            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
     for i in range(cores):
         Prozesse[i].start()
         
@@ -138,19 +165,17 @@ if __name__ == '__main__':
     dicke = np.ndarray((0,1280),dtype=np.uint16)
 
     for i in range(cores):
-        print 'queuet', i
+        #print 'queuet', i
         dicke = np.append(dicke,Queues[i].get(),axis=0)
 
     for i in range(cores):
-        print 'joint', i
+        #print 'joint', i
         Prozesse[i].join()
 
     t2 = time.time()
 
 
-    print t2-t1, 'Sekunden'
-
-    #print (t2-t1)/60, 'Minuten'
+    print t2-t1, 'seconds just for the calculation'
 
     # count not fitted values
 
@@ -159,25 +184,12 @@ if __name__ == '__main__':
     print 'not fitted values',not_fitted
     print 'in percent:', not_fitted_percent
 
-    # write data into file, with timestamp and all parameters
-
-    # p = open(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt','w') 
-    # p.write(time.strftime("%d.%m.%Y at %H:%M:%S")+'\n')
-    # p.write('folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n')
-    # for i in xrange(len(dicke)):
-    #     for k in xrange(len(dicke[0])):
-    #         if dicke[i][k] > 0:
-    #             p.write(str(dicke[i][k])+' ')
-    #         else:
-    #             p.write('-' + ' ')
-    #     p.write('\n')
-    # p.close()
-
+    print 'write data to file'
     # use numpy function to save array to file, '0' and not '-' used for missing values
     HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
     np.savetxt(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt',dicke,fmt='%d',header=HEADER )
 
-print (time.time()-t_a_start), ' seconds'
+print (time.time()-t_a_start), ' seconds for the whole program'
     #plt.figure(1)
     #plt.show()
 

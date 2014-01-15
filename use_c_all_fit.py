@@ -8,7 +8,7 @@
 
 
 # enter folder with data, no subfolders allowed
-folder = '50nN' 
+folder = '40x_500ms' 
 
 
 # chose wavelength range and step-width
@@ -18,7 +18,7 @@ wave_end = 750      # [nm]
 wave_step = 1       # [nm]
 
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
-tolerance=1.5
+tolerance=1
 
 # define parameters for minima detection  
 lookahead_min = 5 # something like peak width for the minima
@@ -26,8 +26,8 @@ delta = 7    # something like peak height
 
 # chose elastomer thickness range , tha smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 1000   # [nm]
-d_max= 19000 # [nm]
+d_min= 6000   # [nm]
+d_max= 9000 # [nm]
 
 use_thickness_limits = False # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
@@ -58,7 +58,9 @@ if __name__ == '__main__':
     # enter number of cpu cores, this has to be an integer number!
     # number of physical cores is a good start, but you can try with a larger as well
 
+    multi_p = False   # True for multiprocessing, False for single core (Windows)
     cores=4
+
     
     # enter name of simulation_file
 
@@ -132,46 +134,55 @@ if __name__ == '__main__':
             wave_block=[]
 
     print 'perform the calculations'
-    # define queue for the multiprocessing
-    def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit):
-
-        que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
-        #print 'Schlange ist satt'
-
     t1 = time.time()
-    
-    # devide the rows by the core-number --> to split it equally, assing the rest to the last process
-    Zeile_Teil = 1024/cores
-    Zeile_Rest = 1024%cores
+    # define queue for the multiprocessing
 
-    # start multiprocessing with queues
+    if multi_p == True:
 
-    Prozesse = []
-    Queues = []
+        def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit):
 
-    for i in range(cores):
-        Queues.append(mp.Queue())
+            que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
+            #print 'Schlange ist satt'
 
-    for i in range(cores):
-        if i < cores-1:
-            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
-        if i == cores-1:
-            Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
-    for i in range(cores):
-        Prozesse[i].start()
         
+        
+        # devide the rows by the core-number --> to split it equally, assing the rest to the last process
+        Zeile_Teil = 1024/cores
+        Zeile_Rest = 1024%cores
 
-    # initialise array for thicknesses
-    dicke = np.ndarray((0,1280),dtype=np.uint16)
+        # start multiprocessing with queues
 
-    for i in range(cores):
-        #print 'queuet', i
-        dicke = np.append(dicke,Queues[i].get(),axis=0)
+        Prozesse = []
+        Queues = []
 
-    for i in range(cores):
-        #print 'joint', i
-        Prozesse[i].join()
+        for i in range(cores):
+            Queues.append(mp.Queue())
 
+        for i in range(cores):
+            if i < cores-1:
+                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+            if i == cores-1:
+                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+        for i in range(cores):
+            Prozesse[i].start()
+            
+
+        # initialise array for thicknesses
+        dicke = np.ndarray((0,1280),dtype=np.uint16)
+
+        for i in range(cores):
+            #print 'queuet', i
+            dicke = np.append(dicke,Queues[i].get(),axis=0)
+
+        for i in range(cores):
+            #print 'joint', i
+            Prozesse[i].join()
+
+    if multi_p == False:
+        start = 0
+        ende = 1024
+
+        dicke = Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)
     t2 = time.time()
 
 
@@ -187,6 +198,7 @@ if __name__ == '__main__':
     print 'write data to file'
     # use numpy function to save array to file, '0' and not '-' used for missing values
     HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
+    
     np.savetxt(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt',dicke,fmt='%d',header=HEADER )
 
 print (time.time()-t_a_start), ' seconds for the whole program'

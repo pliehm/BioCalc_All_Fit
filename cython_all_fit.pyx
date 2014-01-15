@@ -18,7 +18,7 @@ ctypedef np.float DTYPE_t2
 cdef float _abs(float a): return a if a>=0 else -a
 
 @cython.boundscheck(False)
-cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, unsigned short tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array,current_index,thickness_list):
+cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array,current_index,thickness_list):
 
 # cython type definition of the used objects
  
@@ -117,7 +117,7 @@ cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array
         return 0, 0
 
 @cython.boundscheck(False)
-cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, unsigned short tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array, current_index, thickness_list, thickness_limit):
+cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array, current_index, thickness_list, thickness_limit):
 
 # cython type definition of the used objects
  
@@ -303,7 +303,7 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
     
 # find reflection minima for every pixel
 
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, unsigned short tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
     cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,1280),np.uint16 )
     cdef unsigned short spalte, zeile
     cdef np.ndarray[DTYPE_t, ndim=1] intensity

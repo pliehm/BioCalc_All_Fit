@@ -61,7 +61,7 @@ if __name__ == '__main__':
     # enter number of cpu cores, this has to be an integer number!
     # number of physical cores is a good start, but you can try with a larger as well
 
-    multi_p = False   # True for multiprocessing, False for single core (Windows)
+    multi_p = True   # True for multiprocessing, False for single core (Windows)
     cores=4
 
     
@@ -163,9 +163,9 @@ if __name__ == '__main__':
 
         for i in range(cores):
             if i < cores-1:
-                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
             if i == cores-1:
-                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+                Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
         for i in range(cores):
             Prozesse[i].start()
             

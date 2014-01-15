@@ -311,7 +311,8 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
     cdef unsigned int counter=start, 
     cdef np.ndarray[double,ndim=1] sim_wave_blocks_array
     cdef np.ndarray[DTYPE_t,ndim=1] array_thickness_pos, array_length_block, thickness
-    cdef unsigned int current_thickness = 0, current_index = 0, last_thickness = 0, last_index = 0
+    cdef unsigned int current_thickness = 0, current_index = 0, last_index = 0
+    cdef float last_thickness = 0
     # build another sim_waves_m list with different list class
     cdef list a = [] # dummy list
     cdef list thickness_list = []
@@ -338,6 +339,14 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
             print counter
             counter+=1
             for spalte in xrange(1280):
+                if spalte>2:
+                    last_thickness = thickness_ready[zeile][spalte-1] + thickness_ready[zeile][spalte-2] + thickness_ready[zeile][spalte-3]
+                    last_thickness = last_thickness/3.0
+                    if zeile >0:
+                        last_thickness += thickness_ready[zeile-1][spalte] + thickness_ready[zeile][spalte-1] + thickness_ready[zeile][spalte-2] + thickness_ready[zeile][spalte-3]
+                        last_thickness = last_thickness/5.0
+                        if last_thickness > thickness_list[0] + thickness_limit:
+                            last_index = thickness_list.index(int(last_thickness)) 
                 intensity = data[:,zeile, spalte]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)
                 if last_thickness != 0:

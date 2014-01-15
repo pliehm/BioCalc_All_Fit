@@ -18,18 +18,21 @@ wave_end = 750      # [nm]
 wave_step = 1       # [nm]
 
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
+
 tolerance=1
 
 # define parameters for minima detection  
+
 lookahead_min = 5 # something like peak width for the minima
 delta = 7    # something like peak height
 
-# chose elastomer thickness range , tha smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
+# chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
 d_min= 6000   # [nm]
 d_max= 9000 # [nm]
 
 use_thickness_limits = False # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
+
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
 
@@ -198,7 +201,7 @@ if __name__ == '__main__':
     print 'write data to file'
     # use numpy function to save array to file, '0' and not '-' used for missing values
     HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
-    
+
     np.savetxt(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt',dicke,fmt='%d',header=HEADER )
 
 print (time.time()-t_a_start), ' seconds for the whole program'

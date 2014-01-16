@@ -15,11 +15,11 @@ folder = '40x_500ms'
 
 wave_start = 550    # [nm]
 wave_end = 750      # [nm]
-wave_step = 1       # [nm]
+
 
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
 
-tolerance=1
+tolerance = 1
 
 # define parameters for minima detection  
 
@@ -28,12 +28,12 @@ delta = 7    # something like peak height
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 6000   # [nm]
-d_max= 9000 # [nm]
+d_min= 4000   # [nm]
+d_max= 11000 # [nm]
 
-use_thickness_limits = False # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
+use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
 
-thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
+thickness_limit = 100 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
 
 ############################
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     # number of physical cores is a good start, but you can try with a larger as well
 
     multi_p = True   # True for multiprocessing, False for single core (Windows)
-    cores=4
+    cores = 4
 
     
     # enter name of simulation_file
@@ -73,7 +73,8 @@ if __name__ == '__main__':
 
     # make wavelength list
 
-
+    wave_step = 1       # [nm]
+    
     waves=[]
 
     waves=[wave_start + i*wave_step for i in xrange((wave_end-wave_start)/wave_step + 1)]
@@ -202,9 +203,32 @@ if __name__ == '__main__':
     # use numpy function to save array to file, '0' and not '-' used for missing values
     HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
 
-    np.savetxt(folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt',dicke,fmt='%d',header=HEADER )
+    file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
+    np.savetxt(file_name,dicke,fmt='%d',header=HEADER )
 
-print (time.time()-t_a_start), ' seconds for the whole program'
+    ### script to replace a certain string or string combination in a file
+
+    #t_replace_1 = time.time()
+
+    # do it twice because 0 0 would not be - - but - 0 since the empty character before the second 0 has already been read
+    for i in range(2):
+        p = open(file_name,'r')
+
+        string = p.read()
+
+        p.close()
+
+        string = string.replace(' 0 ', ' - ')
+        string = string.replace('\n'+'0 ', '\n'+'- ')
+        string = string.replace(' 0'+'\n', ' -'+'\n')
+
+        p = open(file_name,'w')
+
+        p.write(string)
+
+        p.close()
+    #print (time.time()-t_replace_1), ' seconds for replaceing 0 with -'
+    print (time.time()-t_a_start), ' seconds for the whole program'
     #plt.figure(1)
     #plt.show()
 

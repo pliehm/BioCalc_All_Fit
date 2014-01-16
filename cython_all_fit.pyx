@@ -345,7 +345,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     if zeile >0:
                         last_thickness += thickness_ready[zeile-1][spalte] + thickness_ready[zeile][spalte-1] + thickness_ready[zeile][spalte-2] + thickness_ready[zeile][spalte-3]
                         last_thickness = last_thickness/5.0
-                        if last_thickness > thickness_list[0] + thickness_limit:
+                    if last_thickness > thickness_list[0] + thickness_limit:
                             last_index = thickness_list.index(int(last_thickness)) 
                 intensity = data[:,zeile, spalte]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)

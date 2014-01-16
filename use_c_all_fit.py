@@ -36,6 +36,12 @@ use_thickness_limits = True # Enter "True" if you want to do calculation with th
 thickness_limit = 100 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
 
+# parameters for printing
+# color map is calculated like (mean_thickness - color_min, mean_thickness + color_max) 
+
+color_min = 100
+color_max = 100
+
 ############################
 ### END of INPUT SECTION ###
 ############################
@@ -201,7 +207,7 @@ if __name__ == '__main__':
 
     print 'write data to file'
     # use numpy function to save array to file, '0' and not '-' used for missing values
-    HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
+    HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
 
     file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
     np.savetxt(file_name,dicke,fmt='%d',header=HEADER )
@@ -229,7 +235,13 @@ if __name__ == '__main__':
         p.close()
     #print (time.time()-t_replace_1), ' seconds for replaceing 0 with -'
     print (time.time()-t_a_start), ' seconds for the whole program'
-    #plt.figure(1)
-    #plt.show()
+
+    # plot datta
+    
+    plt.figure(folder)
+    plt.imshow(dicke)
+    plt.clim(dicke.mean()-color_min,dicke.mean()+color_max)
+    plt.colorbar()
+    plt.show()
 
 

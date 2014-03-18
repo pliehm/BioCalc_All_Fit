@@ -14,7 +14,7 @@ folder_list = ['150nN']
 # chose wavelength range and step-width
 
 wave_start = 550    # [nm]
-wave_end = 740      # [nm]
+wave_end = 750      # [nm]
 
 
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -242,7 +242,13 @@ if __name__ == '__main__':
 
         print 'write data to file'
         # use numpy function to save array to file, '0' and not '-' used for missing values
-        HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n' + '\n'
+        HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
+        if x_y_smooth == True:
+            HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
+        if lambda_smooth == True:
+            HEADER+= 'lambda smoothing done with sigma = ' + str(lambda_sigma) + '\n'
+
+        HEADER+= '\n'
 
         file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
         np.savetxt(file_name,dicke,fmt='%d',header=HEADER )

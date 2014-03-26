@@ -8,7 +8,7 @@
 
 
 # enter folder with data, no subfolders allowed
-folder_list = ['150nN'] 
+folder_list = ['0','500','1000','1500','2000','2500','3000','3500','4000'] 
 
 
 # chose wavelength range and step-width
@@ -28,10 +28,10 @@ delta = 7    # something like peak height
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 1000   # [nm]
-d_max= 6000 # [nm]
+d_min= 6000   # [nm]
+d_max= 12000 # [nm]
 
-use_thickness_limits = False # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
+use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
 
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
@@ -45,7 +45,7 @@ color_max = 500
 # enter True if you want to enable this smoothing
 x_y_smooth = False
 # enter sigma for the gaussian smoothing
-x_y_sigma = 1
+x_y_sigma = 0.1
 
 lambda_smooth = False
 lambda_sigma = 1
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         
         #generates an empty array --> image grey values 
         alle=np.zeros(((wave_end-wave_start)/wave_step + 1,1024,1280),np.uint16)
-        
+        alle_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,1024,1280),np.uint16)
         # define function to convert the image-string to an array
         def image2array(Img):
             newArr= np.fromstring(Img.tostring(),np.uint8)
@@ -250,7 +250,18 @@ if __name__ == '__main__':
 
         HEADER+= '\n'
 
-        file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
+        if x_y_smooth == True and lambda_smooth == False:
+            file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'_x_y_sigma_' + str(x_y_sigma) + '_smoothed.txt'
+            
+        if lambda_smooth == True and x_y_smooth == False:
+            file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'_lambda_sigma_' + str(lambda_sigma) + '_smoothed.txt'
+
+        if lambda_smooth == True and x_y_smooth == True:
+            file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'_x_y_sigma_' + str(x_y_sigma) + '_lambda_sigma_' +str(lambda_sigma) + '_smoothed.txt'
+
+        if lambda_smooth == False and x_y_smooth == False: 
+            file_name = folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
+
         np.savetxt(file_name,dicke,fmt='%d',header=HEADER )
 
         ### script to replace a certain string or string combination in a file
@@ -283,6 +294,6 @@ if __name__ == '__main__':
         plt.imshow(dicke)
         plt.clim(dicke.mean()-color_min,dicke.mean()+color_max)
         plt.colorbar()
-        plt.show()
+        #plt.show()
 
 

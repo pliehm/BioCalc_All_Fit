@@ -8,7 +8,7 @@
 
 
 # enter folder with data, no subfolders allowed
-data_folder = 'H9'
+data_folder = 'ICube'
 
 
 # chose wavelength range and step-width
@@ -28,8 +28,8 @@ delta = 7    # something like peak height
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 5000   # [nm]
-d_max= 11000 # [nm]
+d_min= 3000  # [nm]
+d_max= 15000 # [nm]
 
 use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
 
@@ -100,14 +100,26 @@ if __name__ == '__main__':
         dateien=os.listdir(data_folder+'/'+folder)
         dateien.sort()
         
+        # get size, bit-depth of the images, 
+        Img = im.open(data_folder + '/'+folder + '/' + dateien[0])
+        Image_width = Img.size[0]
+        Image_height = Img.size[1]
+        Image_mode = Img.mode 
+        if Image_mode == 'RGB' or Image_mode == 'P':
+            Image_bit = '8'
+        elif Image_mode == 'I;16' or Image_mode == 'I;12':
+            Image_bit == '16'
+        else:
+            print 'Image mode is:', Img.mode
+            testttt = input('Unknown Image mode, ask Philipp for help, sorry for the inconvenience! Abort the programm with CTRL+C or CTRL+Z, maybe several times')     
         #generates an empty array --> image grey values 
-        alle=np.zeros(((wave_end-wave_start)/wave_step + 1,1024,1280),np.uint16)
-        alle_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,1024,1280),np.uint16)
+        alle=np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+        alle_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
         # define function to convert the image-string to an array
         def image2array(Img):
-            newArr= np.fromstring(Img.tostring(),np.uint8)
-            newArr= np.reshape(newArr, (1024,1280))
-            return newArr
+            newArr= np.fromstring(Img.tostring(), np.uint16)
+            newArr= np.reshape(newArr, (Image_height,Image_width))
+
 
         # read every image in folder and check if it is in the wavelength range --> 
         # write grey values into array
@@ -123,14 +135,16 @@ if __name__ == '__main__':
                 if int(dateien[i][:3]) >= wave_start and int(dateien[i][:3]) <= wave_end:
                     #print dateien[i]
                     #print counter
-                    Img=im.open(data_folder + '/'+folder + '/' + dateien[i]).convert('L')
-                    alle[counter]=image2array(Img)
+                    Img=im.open(data_folder + '/'+folder + '/' + dateien[i])
+                    if Image_bit == '8':
+                        Img = Img.convert('L')
+
+                    alle[counter]=np.asarray(Img)
                     # smoothing x-y direction
                     if x_y_smooth == True:
                         Img_s = ndimage.gaussian_filter(Img, sigma=x_y_sigma)
-                        alle_x_y_smooth[counter] = image2array(Img_s)
+                        alle_x_y_smooth[counter] = np.asarray(Img_s)
                     counter+= 1
-
 ##################################
 ##### Section for smoothing ######
 ##################################
@@ -140,10 +154,11 @@ if __name__ == '__main__':
 
         if lambda_smooth == True:
             print 'smoothing over wavelength with sigma = ', lambda_sigma
-            for zeile in range(1024):
+            for zeile in range(Image_height):
                 #print zeile
-                for spalte in range(1280):
+                for spalte in range(Image_width):
                     alle[:,zeile,spalte] = ndimage.gaussian_filter1d(alle[:,zeile,spalte],lambda_sigma)
+
 
 #####################################
 ##### END section for smoothing #####
@@ -194,8 +209,8 @@ if __name__ == '__main__':
             
             
             # devide the rows by the core-number --> to split it equally, assing the rest to the last process
-            Zeile_Teil = 1024/cores
-            Zeile_Rest = 1024%cores
+            Zeile_Teil = Image_height/cores
+            Zeile_Rest = Image_height%cores
 
             # start multiprocessing with queues
 
@@ -215,7 +230,7 @@ if __name__ == '__main__':
                 
 
             # initialise array for thicknesses
-            dicke = np.ndarray((0,1280),dtype=np.uint16)
+            dicke = np.ndarray((0,Image_width),dtype=np.uint16)
 
             for i in range(cores):
                 #print 'queuet', i
@@ -227,7 +242,7 @@ if __name__ == '__main__':
 
         if multi_p == False:
             start = 0
-            ende = 1024
+            ende = Image_height
 
             dicke = Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)
         t2 = time.time()
@@ -237,8 +252,8 @@ if __name__ == '__main__':
 
         # count not fitted values
 
-        not_fitted = 1024*1280 - np.count_nonzero(dicke)
-        not_fitted_percent = 100.0/(1024*1280)*not_fitted
+        not_fitted = Image_height*Image_width - np.count_nonzero(dicke)
+        not_fitted_percent = 100.0/(Image_height*Image_width)*not_fitted
         print 'not fitted values',not_fitted
         print 'in percent:', not_fitted_percent
 

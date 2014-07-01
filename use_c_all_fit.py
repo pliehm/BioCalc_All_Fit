@@ -8,7 +8,7 @@
 
 
 # enter folder with data, no subfolders allowed
-folder_list = ['0','500','1000','1500','2000','2500','3000','3500','4000'] 
+data_folder = 'H9'
 
 
 # chose wavelength range and step-width
@@ -28,8 +28,8 @@ delta = 7    # something like peak height
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 6000   # [nm]
-d_max= 12000 # [nm]
+d_min= 5000   # [nm]
+d_max= 11000 # [nm]
 
 use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "False"
 
@@ -72,6 +72,8 @@ import matplotlib.pyplot as plt
 t_a_start = time.time() # start timer for runtime measurement
 
 if __name__ == '__main__':
+    print os.listdir(data_folder)
+    folder_list = os.listdir(data_folder)
     for folder in folder_list:
         # enter number of cpu cores, this has to be an integer number!
         # number of physical cores is a good start, but you can try with a larger as well
@@ -82,7 +84,7 @@ if __name__ == '__main__':
         
         # enter name of simulation_file
 
-        sim_file = 'Sim_0.5Cr_20Au_Elastomer_RT601_20Au_500_750nm.txt'
+        sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
         lookahead_max = lookahead_min-1 # for the maxima --> should not be larger than lookahead_min
 
@@ -95,7 +97,7 @@ if __name__ == '__main__':
         waves=[wave_start + i*wave_step for i in xrange((wave_end-wave_start)/wave_step + 1)]
 
         ## read image data 
-        dateien=os.listdir(folder)
+        dateien=os.listdir(data_folder+'/'+folder)
         dateien.sort()
         
         #generates an empty array --> image grey values 
@@ -121,7 +123,7 @@ if __name__ == '__main__':
                 if int(dateien[i][:3]) >= wave_start and int(dateien[i][:3]) <= wave_end:
                     #print dateien[i]
                     #print counter
-                    Img=im.open(folder + '/' + dateien[i]).convert('L')
+                    Img=im.open(data_folder + '/'+folder + '/' + dateien[i]).convert('L')
                     alle[counter]=image2array(Img)
                     # smoothing x-y direction
                     if x_y_smooth == True:

@@ -10,7 +10,8 @@ DTYPE1 = np.uint16
 ctypedef np.uint16_t DTYPE_t
 DTYPE2 = np.float
 ctypedef np.float DTYPE_t2
-
+DTYPE3 = np.uint32
+ctypedef np.uint32_t DTYPE_t3
 
 # fit simulated and experimental minima to calculate thickness
 # problem: speed!! --> one main problem is the access of the large list sim_waves --> can this be written as an array?
@@ -18,7 +19,7 @@ ctypedef np.float DTYPE_t2
 cdef float _abs(float a): return a if a>=0 else -a
 
 @cython.boundscheck(False)
-cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array,current_index,thickness_list):
+cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array,current_index,thickness_list):
 
 # cython type definition of the used objects
  
@@ -117,7 +118,7 @@ cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array
         return 0, 0
 
 @cython.boundscheck(False)
-cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array, current_index, thickness_list, thickness_limit):
+cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array, current_index, thickness_list, thickness_limit):
 
 # cython type definition of the used objects
  
@@ -242,8 +243,8 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 
     #maxima and minima candidates are temporarily stored in 
     #mx and mn respectively
-    cdef int mn = 1000
-    cdef int mx = -1000
+    cdef int mn = 100000
+    cdef int mx = -100000
     cdef unsigned short x,y, index
 
     for index, (x,y) in enumerate(zip(x_axis[:-lookahead_min], y_axis[:-lookahead_min])):
@@ -258,7 +259,7 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 
         #### look for max ####
         
-        if y < mx-delta and mx != 1000:
+        if y < mx-delta and mx != 100000:
             #Maxima peak candidate found
             # lool ahead in signal to ensure that this is a peak and not jitter
             if max(y_axis_list[index:index+lookahead_max]) < mx:
@@ -266,8 +267,8 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
                 dump.append(True)
                 #set algorithm to only find minima now
                 
-                mx = 1000
-                mn = 1000
+                mx = 100000
+                mn = 100000
                 if index+lookahead_min >= length:
                     #end is within lookahead no more peaks can be found
                     break
@@ -275,15 +276,15 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 
         #### look for min ####    
         
-        if y > mn+delta and mn != -1000:
+        if y > mn+delta and mn != -100000:
             #Minima peak candidate found
             # look ahead in signal to ensure that this is a peak and not jitter
             if min(y_axis_list[index:index+lookahead_min]) > mn:
                 min_peaks.append(mnpos)
                 dump.append(False)
                 #set algorithm to only find maximum now
-                mn = -1000
-                mx = -1000
+                mn = -100000
+                mx = -100000
                 if index+lookahead_min >= length:
                     #end is within lookahead no more peaks can be found
                     break
@@ -304,13 +305,15 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 # find reflection minima for every pixel
 
 def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
-    cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,1280),np.uint16 )
+    cdef unsigned int Image_width = len(data[0][0])
+    cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,Image_width),np.uint16 )
     cdef unsigned short spalte, zeile
     cdef np.ndarray[DTYPE_t, ndim=1] intensity
     cdef np.ndarray[double,ndim=1] minima_exp
     cdef unsigned int counter=start, 
     cdef np.ndarray[double,ndim=1] sim_wave_blocks_array
-    cdef np.ndarray[DTYPE_t,ndim=1] array_thickness_pos, array_length_block, thickness
+    cdef np.ndarray[DTYPE_t,ndim=1] array_length_block, thickness
+    cdef np.ndarray[DTYPE_t3,ndim=1] array_thickness_pos
     cdef unsigned int current_thickness = 0, current_index = 0, last_index = 0, limit_counter = 0
     cdef float last_thickness = 0
     # build another sim_waves_m list with different list class
@@ -325,7 +328,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
             a.append(block[i])
     sim_wave_blocks_array = np.array(a,dtype=np.float)
 
-    array_thickness_pos = np.array(zip(*thickness_pos)[2],dtype=np.uint16)
+    array_thickness_pos = np.array(zip(*thickness_pos)[2],dtype=np.uint32)
     array_length_block = np.array(zip(*thickness_pos)[1],dtype=np.uint16)
     thickness = np.array(zip(*thickness_pos)[0],dtype=np.uint16)
 
@@ -338,7 +341,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
         for zeile in range(len(data[0])):
             print counter
             counter+=1
-            for spalte in xrange(1280):
+            for spalte in xrange(Image_width):
                 last_thickness = 0
                 last_index = 0
                 current_thickness = 0
@@ -443,7 +446,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
         for zeile in range(len(data[0])):
             print counter
             counter+=1
-            for spalte in xrange(1280):
+            for spalte in xrange(Image_width):
                 intensity = data[:,zeile, spalte]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)
                 current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,current_index,thickness_list))

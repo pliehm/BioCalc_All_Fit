@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurementes)
 
-data = ['2000_20x_centre','for_Nils_2']
+data = ['ICube','Side','Eye']
 
 
 # chose wavelength range and step-width
@@ -30,6 +30,12 @@ tolerance = 1
 
 lookahead_min = 5 # something like peak width for the minima
 delta = 7    # something like peak height
+
+
+# enter name of simulation_file, copy and paste the file name of the
+# simulation file corresponding to your layer structure
+
+sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
@@ -76,6 +82,8 @@ import Image as im
 from scipy import ndimage
 import multiprocessing as mp
 import matplotlib.pyplot as plt
+
+version = 'BioCalc 2.0'
 
 t_a_start = time.time() # start timer for runtime measurement
 
@@ -140,7 +148,7 @@ if __name__ == '__main__':
             else:
                 print 'no smoothing of the wavelength images'    
             for i in xrange(len(dateien)):
-                if dateien[i][-5:]=='.tiff':
+                if dateien[i][-5:]=='.tiff' or dateien[i][-4:]=='.tif':
                     if int(dateien[i][:3]) >= wave_start and int(dateien[i][:3]) <= wave_end:
                         #print dateien[i]
                         #print counter
@@ -178,7 +186,7 @@ if __name__ == '__main__':
             # read simulation file 
             print 'read simulated data'
 
-            p= open(sim_file,'r')
+            p= open('Simulated_minima/' + sim_file,'r')
 
             string=p.read()
 
@@ -270,7 +278,7 @@ if __name__ == '__main__':
 
             print 'write data to file'
             # use numpy function to save array to file, '0' and not '-' used for missing values
-            HEADER = time.strftime("%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
+            HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
             if x_y_smooth == True:
                 HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
             if lambda_smooth == True:

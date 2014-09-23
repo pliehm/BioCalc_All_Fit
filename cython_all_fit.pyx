@@ -304,7 +304,7 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
     
 # find reflection minima for every pixel
 
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
     cdef unsigned int Image_width = len(data[0][0])
     cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,Image_width),np.uint16 )
     cdef unsigned short spalte, zeile
@@ -404,13 +404,13 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     
                     if current_thickness == 0: 
                         for new_delta in range(1,5):
-                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta),dtype=np.float)
+                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                             current_thickness, current_index = (Fit_2(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array, last_index, thickness_list,thickness_limit))
                             
                             if current_thickness != 0:
                                 thickness_ready[zeile][spalte] = current_thickness
                                 break
-                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta), dtype=np.float)
+                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary), dtype=np.float)
                             current_thickness, current_index = (Fit_2(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array, last_index,thickness_list,thickness_limit))
                 
                             if current_thickness != 0:
@@ -426,13 +426,13 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
                 if current_thickness == 0: 
                     for new_delta in range(1,5):
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                         current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array, current_index, thickness_list))
                         
                         if current_thickness != 0:
                             thickness_ready[zeile][spalte] = current_thickness
                             break
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta), dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary), dtype=np.float)
                         current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array, current_index,thickness_list))
                         
                         if current_thickness != 0:
@@ -454,13 +454,13 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
                 if current_thickness == 0: # if no thickness was fitted, try again 
                     for new_delta in range(1,5):
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                         current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array, current_index, thickness_list))
                         
                         if current_thickness != 0:
                             thickness_ready[zeile][spalte] = current_thickness
                             break
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta), dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary), dtype=np.float)
                         current_thickness, current_index = (Fit(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,current_index,thickness_list))
                         
                         if current_thickness != 0:

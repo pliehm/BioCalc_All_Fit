@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurementes)
 
-data = ['ICube','Side','Eye']
+data = ['10_new_vary']
 
 
 # chose wavelength range and step-width
@@ -29,13 +29,12 @@ tolerance = 1
 # define parameters for minima detection  
 
 lookahead_min = 5 # something like peak width for the minima
-delta = 7    # something like peak height
 
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
+sim_file = 'Sim_0.5Cr_25Ag_50SiO2_Elastomer_RT601_25Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
@@ -47,9 +46,9 @@ use_thickness_limits = True # Enter "True" if you want to do calculation with th
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
 # enter True if you want to enable this smoothing
-x_y_smooth = False
+x_y_smooth = True
 # enter sigma for the gaussian smoothing
-x_y_sigma = 0.1
+x_y_sigma = 0.5
 
 # parameters for printing
 # color map is calculated like (mean_thickness - color_min, mean_thickness + color_max) 
@@ -82,12 +81,14 @@ import Image as im
 from scipy import ndimage
 import multiprocessing as mp
 import matplotlib.pyplot as plt
-
-version = 'BioCalc 2.0'
+from skimage.io import imread
+from skimage.filter import gaussian_filter
+version = 'BioCalc 2.1'
 
 t_a_start = time.time() # start timer for runtime measurement
 
 if __name__ == '__main__':
+
     for data_folder in data:
         folder_list = os.listdir(data_folder)
         for folder in folder_list:
@@ -96,11 +97,6 @@ if __name__ == '__main__':
 
             multi_p = True   # True for multiprocessing, False for single core (Windows)
             cores = 4
-
-            
-            # enter name of simulation_file
-
-            sim_file = 'Sim_0.5Cr_25Ag_50SiO2_Elastomer_RT601_25Au_500_760nm.txt'
 
             lookahead_max = lookahead_min-1 # for the maxima --> should not be larger than lookahead_min
 
@@ -116,8 +112,11 @@ if __name__ == '__main__':
             dateien=os.listdir(data_folder+'/'+folder)
             dateien.sort()
             
-            # get size, bit-depth of the images, 
-            Img = im.open(data_folder + '/'+folder + '/' + dateien[0])
+            # get size, bit-depth of the images
+            for i in range(len(dateien)):
+                if dateien[i][-5:]=='.tiff' or dateien[i][-4:]=='.tif':
+                    Img=im.open(data_folder + '/'+folder + '/' + dateien[i])
+                    break
             Image_width = Img.size[0]
             Image_height = Img.size[1]
             Image_mode = Img.mode 
@@ -152,15 +151,19 @@ if __name__ == '__main__':
                     if int(dateien[i][:3]) >= wave_start and int(dateien[i][:3]) <= wave_end:
                         #print dateien[i]
                         #print counter
-                        Img=im.open(data_folder + '/'+folder + '/' + dateien[i])
+                        Img=data_folder + '/'+folder + '/' + dateien[i]
                         if Image_bit == '8':
+                            Img = im.open(data_folder + '/'+folder + '/' + dateien[i])
                             Img = Img.convert('L')
-
-                        alle[counter]=np.asarray(Img)
+                            alle[counter]=np.asarray(Img)
+                        else:
+                            alle[counter]=imread(Img, as_grey=True)
                         # smoothing x-y direction
                         if x_y_smooth == True:
-                            Img_s = ndimage.gaussian_filter(Img, sigma=x_y_sigma)
-                            alle_x_y_smooth[counter] = np.asarray(Img_s)
+                            if Image_bit == '8':
+                                Img_s = ndimage.gaussian_filter(Img, sigma=x_y_sigma)
+                            else:
+                                alle_x_y_smooth[counter] = gaussian_filter(imread(Img_s),sigma=x_y_sigma)
                         counter+= 1
     ##################################
     ##### Section for smoothing ######
@@ -175,7 +178,11 @@ if __name__ == '__main__':
                 for zeile in range(Image_height):
                     #print zeile
                     for spalte in range(Image_width):
-                        alle[:,zeile,spalte] = ndimage.gaussian_filter1d(alle[:,zeile,spalte],lambda_sigma)
+                        if Image_bit == '8':
+                            alle[:,zeile,spalte] = ndimage.gaussian_filter1d(alle[:,zeile,spalte],lambda_sigma)
+                        else:
+                            alle[:,zeile,spalte] = gaussian_filter(alle[:,zeile,spalte],sigma = lambda_sigma)
+                        
 
 
     #####################################
@@ -216,13 +223,42 @@ if __name__ == '__main__':
 
             print 'perform the calculations'
             t1 = time.time()
+
+####################################################
+## Find new delta to deal with different dynamics ##
+####################################################
+               
+            # use different delta scaling for 8,12,16 bit
+            if Image_bit == '16':
+                # local_min = np.where(alle[:50]<=alle[:50].min())
+                # if len(local_min[0])>1:
+                #     local_min_temp = []
+                #     local_min_temp = [local_min[0][0],local_min[0][1],local_min[0][2]]
+                #     local_min = local_min_temp
+                # local_profile = alle[:,int(local_min[1]),int(local_min[2])][:50]
+                # new_delta = (local_profile.max() - local_profile.min())/2
+                new_delta = int(alle.mean()/10)
+                if new_delta > 7:
+                    delta = new_delta
+
+            if Image_bit == '8':
+                delta = 7    
+
+            delta_vary = int(delta/5-delta/20)
+            print 'delta = ', delta
+
+##############################################################
+## Start calculations either with multiprocessing or single ##
+##############################################################
+
+
             # define queue for the multiprocessing
 
             if multi_p == True:
 
-                def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit):
+                def put_into_queue(start,ende,que,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit):
 
-                    que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
+                    que.put(Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
                     #print 'Schlange ist satt'
 
                 
@@ -241,9 +277,9 @@ if __name__ == '__main__':
 
                 for i in range(cores):
                     if i < cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit)))
                     if i == cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],alle[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit)))
                 for i in range(cores):
                     Prozesse[i].start()
                     
@@ -263,7 +299,7 @@ if __name__ == '__main__':
                 start = 0
                 ende = Image_height
 
-                dicke = Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,s_waves_arrays, use_thickness_limits, thickness_limit)
+                dicke = Fit.c_Fit_Pixel(start,ende,alle, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,s_waves_arrays, use_thickness_limits, thickness_limit)
             t2 = time.time()
 
 
@@ -278,7 +314,7 @@ if __name__ == '__main__':
 
             print 'write data to file'
             # use numpy function to save array to file, '0' and not '-' used for missing values
-            HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-5'+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
+            HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
             if x_y_smooth == True:
                 HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
             if lambda_smooth == True:

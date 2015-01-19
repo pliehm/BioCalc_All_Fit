@@ -308,7 +308,7 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
     cdef unsigned int Image_width = len(data[0][0])
     cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,Image_width),np.uint16 )
-    cdef unsigned short spalte, zeile
+    cdef unsigned short spalte, zeile, spalte_c, zeile_c, spalte_c_max = 3, zeile_c_max = 3
     cdef np.ndarray[DTYPE_t, ndim=1] intensity
     cdef np.ndarray[double,ndim=1] minima_exp
     cdef unsigned int counter=start, 
@@ -348,53 +348,98 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 current_thickness = 0
                 current_index = 0
 
-                if spalte>2:
-                    if zeile == 0:
-                        last_thickness = 0
-                        limit_counter = 0
+                # write loop to consider the area around the current pixel
 
-                        # checking if thicknesses around current pixel are "0", if not, consider them
-                        if thickness_ready[zeile][spalte-1] != 0:
-                            last_thickness+=  thickness_ready[zeile][spalte-1]
-                            limit_counter += 1
-                        if thickness_ready[zeile][spalte-2] != 0:
-                            last_thickness+= thickness_ready[zeile][spalte-2]
-                            limit_counter += 1
-                        if thickness_ready[zeile][spalte-3] != 0:
-                            last_thickness += thickness_ready[zeile][spalte-3]
-                            limit_counter += 1
-                        if limit_counter != 0:
-                            last_thickness = last_thickness/float(limit_counter)
-                    if zeile >0:
-                        last_thickness = 0
-                        limit_counter = 0
-                        if thickness_ready[zeile][spalte-1] != 0:
-                            last_thickness+=  thickness_ready[zeile][spalte-1]
-                            limit_counter += 1
-                        if thickness_ready[zeile][spalte-2] != 0:
-                            last_thickness+= thickness_ready[zeile][spalte-2]
-                            limit_counter += 1
-                        if thickness_ready[zeile][spalte-3] != 0:
-                            last_thickness += thickness_ready[zeile][spalte-3]
-                            limit_counter += 1
+                # iterate over rows, distance from current row is 0 to zeile_c_max
+                for zeile_c in range(zeile_c_max+1):
+                    # if the considered row is not in the range, stop iteration over rows
+                    if (zeile - zeile_c) < 0:
+                        break
 
-                        if thickness_ready[zeile-1][spalte] != 0:
-                            last_thickness += thickness_ready[zeile-1][spalte]
-                            limit_counter += 1
-                        if thickness_ready[zeile-1][spalte-1] != 0:
-                            last_thickness += thickness_ready[zeile-1][spalte-1]
-                            limit_counter += 1
-                        if thickness_ready[zeile-1][spalte-2] != 0:
-                            last_thickness += thickness_ready[zeile-1][spalte-2]
-                            limit_counter += 1 
-                        if thickness_ready[zeile-1][spalte-3] != 0:
-                            last_thickness += thickness_ready[zeile-1][spalte-3]
-                            limit_counter += 1
-                        if limit_counter != 0:
-                            last_thickness = last_thickness/float(limit_counter)
+                    # block to consider values with subtracted column values
+                    
+                    # iterate over column between 1 to spalte_c_max to not sonsider the same column as current 
+                    for spalte_c in range(1,spalte_c_max+1):
+                        # if the considered column is below the data range, stop loop
+                        if (spalte - spalte_c) < 0:
+                            break
 
-                    if last_thickness > (thickness_list[0] + 2*thickness_limit):
-                            last_index = thickness_list.index(int(last_thickness)) 
+                        # check if the considered value is not zero, if so add the value to a sum and increase the count for later averaging
+                        if thickness_ready[zeile-zeile_c][spalte-spalte_c] != 0:
+                                last_thickness+=  thickness_ready[zeile-zeile_c][spalte-spalte_c]
+                                limit_counter += 1
+
+                    # block to consider values with added column values and same column
+                    for spalte_c in range(spalte_c_max+1):
+                        # if the considered row is the current row, stop, because there are no values
+                        if (zeile_c == 0):
+                            break
+                        # if the considered column is above the data range, stop loop
+                        if (spalte + spalte_c) > Image_width:
+                            break
+                        # check if the considered value is not zero, if so add the value to a sum and increase the count for later averaging
+                        if thickness_ready[zeile-zeile_c][spalte+spalte_c] != 0:
+                                last_thickness+=  thickness_ready[zeile-zeile_c][spalte+spalte_c]
+                                limit_counter += 1
+
+                # check if other values in the area were found
+                if limit_counter != 0:
+                    # calculate average of the area
+                    last_thickness = last_thickness/float(limit_counter)
+
+                # if the thickness in the area is in the thickness list, search for the index of that thickness and store it
+                if last_thickness > (thickness_list[0] + 2*thickness_limit):
+                    last_index = thickness_list.index(int(last_thickness))
+
+                # old jump protection
+
+                # if spalte>2:
+                #     if zeile == 0:
+                #         last_thickness = 0
+                #         limit_counter = 0
+
+                #         # checking if thicknesses around current pixel are "0", if not, consider them
+                #         if thickness_ready[zeile][spalte-1] != 0:
+                #             last_thickness+=  thickness_ready[zeile][spalte-1]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile][spalte-2] != 0:
+                #             last_thickness+= thickness_ready[zeile][spalte-2]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile][spalte-3] != 0:
+                #             last_thickness += thickness_ready[zeile][spalte-3]
+                #             limit_counter += 1
+                #         if limit_counter != 0:
+                #             last_thickness = last_thickness/float(limit_counter)
+                #     if zeile >0:
+                #         last_thickness = 0
+                #         limit_counter = 0
+                #         if thickness_ready[zeile][spalte-1] != 0:
+                #             last_thickness+=  thickness_ready[zeile][spalte-1]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile][spalte-2] != 0:
+                #             last_thickness+= thickness_ready[zeile][spalte-2]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile][spalte-3] != 0:
+                #             last_thickness += thickness_ready[zeile][spalte-3]
+                #             limit_counter += 1
+
+                #         if thickness_ready[zeile-1][spalte] != 0:
+                #             last_thickness += thickness_ready[zeile-1][spalte]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile-1][spalte-1] != 0:
+                #             last_thickness += thickness_ready[zeile-1][spalte-1]
+                #             limit_counter += 1
+                #         if thickness_ready[zeile-1][spalte-2] != 0:
+                #             last_thickness += thickness_ready[zeile-1][spalte-2]
+                #             limit_counter += 1 
+                #         if thickness_ready[zeile-1][spalte-3] != 0:
+                #             last_thickness += thickness_ready[zeile-1][spalte-3]
+                #             limit_counter += 1
+                #         if limit_counter != 0:
+                #             last_thickness = last_thickness/float(limit_counter)
+
+                #     if last_thickness > (thickness_list[0] + 2*thickness_limit):
+                #             last_index = thickness_list.index(int(last_thickness)) 
                 intensity = data[:,zeile, spalte]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)
                 if (last_thickness != 0) and (last_index > 0) :

@@ -17,7 +17,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurementes)
 
-data = ['10_new_vary']
+data = ['1']
 
 
 # chose wavelength range and step-width
@@ -38,19 +38,19 @@ lookahead_min = 5 # something like peak width for the minima
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_25Ag_50SiO2_Elastomer_RT601_25Au_500_760nm.txt'
+sim_file = 'Sim_0.5Cr_15Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 2000 # [nm]
-d_max= 19000 # [nm]
+d_min= 5000 # [nm]
+d_max= 12000 # [nm]
 
 use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see sharpe edges you might need to switch to "Fals"
 
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
 # enter True if you want to enable this smoothing
-x_y_smooth = True
+x_y_smooth = False
 # enter sigma for the gaussian smoothing
 x_y_sigma = 0.5
 
@@ -95,11 +95,12 @@ if __name__ == '__main__':
 
     for data_folder in data:
         folder_list = os.listdir(data_folder)
+        folder_list.sort()
         for folder in folder_list:
             # enter number of cpu cores, this has to be an integer number!
             # number of physical cores is a good start, but you can try with a larger as well
 
-            multi_p = True   # True for multiprocessing, False for single core (Windows)
+            multi_p = False   # True for multiprocessing, False for single core (Windows)
             cores = 4
 
             lookahead_max = lookahead_min-1 # for the maxima --> should not be larger than lookahead_min

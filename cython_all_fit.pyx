@@ -7,6 +7,7 @@ cimport numpy as np
 cimport cython
 
 
+# define types for cython, not sure if this is really necessary, but I found it in one of the examples I used to improve the speed
 DTYPE1 = np.uint16
 ctypedef np.uint16_t DTYPE_t
 DTYPE2 = np.float
@@ -15,10 +16,12 @@ DTYPE3 = np.uint32
 ctypedef np.uint32_t DTYPE_t3
 
 # fit simulated and experimental minima to calculate thickness
-# problem: speed!! --> one main problem is the access of the large list sim_waves --> can this be written as an array?
 
+# define a faster function to calculate the absolute value of a number
 cdef float _abs(float a): return a if a>=0 else -a
 
+
+# function to find the best simulated thickness which fits to the measured set of minima
 @cython.boundscheck(False)
 cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] array_thickness_pos,np.ndarray[DTYPE_t, ndim=1] array_length_block, np.ndarray[double,ndim=1] exp_waves, float tolerance,np.ndarray[double,ndim=1] sim_wave_blocks_array,current_index,thickness_list):
 
@@ -219,8 +222,8 @@ cdef Fit_2(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] ar
     else:
         return 0, 0
 
-# function to get minima of one array
 
+# function to get minima of one array
 
 cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0):
     
@@ -308,7 +311,7 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
 def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
     cdef unsigned int Image_width = len(data[0][0])
     cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,Image_width),np.uint16 )
-    cdef unsigned short spalte, zeile, spalte_c, zeile_c, spalte_c_max = 3, zeile_c_max = 3
+    cdef unsigned short spalte, zeile, spalte_c, zeile_c, spalte_c_max = 1, zeile_c_max = 1
     cdef np.ndarray[DTYPE_t, ndim=1] intensity
     cdef np.ndarray[double,ndim=1] minima_exp
     cdef unsigned int counter=start, 
@@ -321,6 +324,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
     cdef list a = [] # dummy list
     cdef list thickness_list = []
 
+    # make a list with the 
     for i in range(len(thickness_pos)):
         thickness_list.append(int(thickness_pos[i][0]))
 
@@ -336,6 +340,8 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
     print 'x ', len(data) 
     print 'y ', len(data[0])
     print 'z ', len(data[0][0])
+
+    # do calculations with thickness limits
     if use_thickness_limits:
         #print "using thickness limit: ", thickness_limit
 
@@ -347,13 +353,15 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 last_index = 0
                 current_thickness = 0
                 current_index = 0
+                limit_counter = 0
 
                 # write loop to consider the area around the current pixel
 
                 # iterate over rows, distance from current row is 0 to zeile_c_max
                 for zeile_c in range(zeile_c_max+1):
                     # if the considered row is not in the range, stop iteration over rows
-                    if (zeile - zeile_c) < 0:
+                    if zeile  < zeile_c:
+                        #print "stopped 1"
                         break
 
                     # block to consider values with subtracted column values
@@ -361,29 +369,33 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     # iterate over column between 1 to spalte_c_max to not sonsider the same column as current 
                     for spalte_c in range(1,spalte_c_max+1):
                         # if the considered column is below the data range, stop loop
-                        if (spalte - spalte_c) < 0:
+                        if spalte < spalte_c:
+                            #print "stopped 2"
                             break
 
                         # check if the considered value is not zero, if so add the value to a sum and increase the count for later averaging
                         if thickness_ready[zeile-zeile_c][spalte-spalte_c] != 0:
-                                last_thickness+=  thickness_ready[zeile-zeile_c][spalte-spalte_c]
-                                limit_counter += 1
+                            last_thickness+=  thickness_ready[zeile-zeile_c][spalte-spalte_c]
+                            limit_counter += 1
 
                     # block to consider values with added column values and same column
                     for spalte_c in range(spalte_c_max+1):
                         # if the considered row is the current row, stop, because there are no values
                         if (zeile_c == 0):
+                            #print "stopped 3"
                             break
                         # if the considered column is above the data range, stop loop
-                        if (spalte + spalte_c) > Image_width:
+                        if (spalte + spalte_c) >= Image_width:
+                            #print "stopped 4"
                             break
                         # check if the considered value is not zero, if so add the value to a sum and increase the count for later averaging
                         if thickness_ready[zeile-zeile_c][spalte+spalte_c] != 0:
-                                last_thickness+=  thickness_ready[zeile-zeile_c][spalte+spalte_c]
-                                limit_counter += 1
+                            last_thickness+=  thickness_ready[zeile-zeile_c][spalte+spalte_c]
+                            limit_counter += 1
 
                 # check if other values in the area were found
                 if limit_counter != 0:
+                    #print "limit counter is:", limit_counter
                     # calculate average of the area
                     last_thickness = last_thickness/float(limit_counter)
 
@@ -446,6 +458,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     current_thickness, current_index = (Fit_2(thickness,array_thickness_pos, array_length_block, minima_exp,tolerance,sim_wave_blocks_array,last_index,thickness_list, thickness_limit))
                     if current_thickness != 0:
                         thickness_ready[zeile][spalte]=current_thickness
+                        #print "Averaging was successful"
                         #last_thickness, last_index = current_thickness, current_index
                     
                     if current_thickness == 0: 

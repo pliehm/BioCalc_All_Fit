@@ -38,8 +38,8 @@ sim_file = 'Sim_0.5Cr_15Ag_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 2000 # [nm]
-d_max= 19000 # [nm]
+d_min= 5000 # [nm]
+d_max= 12000 # [nm]
 
 use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see sharpe edges you might need to switch to "Fals"
 
@@ -168,9 +168,9 @@ if __name__ == '__main__':
                 Image_bit = '16B'
   
             # create an empty array which will contain all image data 
-            all_imag = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+            all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
             # create another empty array to hold the data for the smoothing
-            all_imag_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+            all_images_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
 
             # define function to convert the image-string (read from file) to an array
             def image2array(Img):
@@ -338,11 +338,11 @@ if __name__ == '__main__':
 
             if multi_p == True:
 
-                def put_into_queue(start,ende,que,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit):
+                def put_into_queue(start,ende,que,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit,area_avrg):
 
                     # it is weird that the arguments of the function are not the same as the arguments which are used --> list_minima_blocks is missing. But it still works
 
-                    que.put(Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
+                    que.put(Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg)) # calls the C-Fit-function
                     #print 'Schlange ist satt'
 
                 
@@ -362,9 +362,9 @@ if __name__ == '__main__':
                 # assign the data properly to the Processes
                 for i in range(cores):
                     if i < cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit,area_avrg)))
                     if i == cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit,area_avrg)))
                 for i in range(cores):
                     Prozesse[i].start()
                     
@@ -393,7 +393,7 @@ if __name__ == '__main__':
                 ende = Image_height
 
                 # call the external cython/c++ function with all the parameters
-                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit)
+                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg)
             t2 = time.time()
 
 

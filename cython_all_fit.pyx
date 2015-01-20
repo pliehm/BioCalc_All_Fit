@@ -308,10 +308,10 @@ cdef list peakdetect(y_axis, x_axis = None, unsigned short lookahead_min=5, unsi
     
 # find reflection minima for every pixel
 
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list sim_wave_blocks_list, use_thickness_limits, unsigned int thickness_limit, unsigned short spalte_c_max):
     cdef unsigned int Image_width = len(data[0][0])
     cdef np.ndarray[DTYPE_t, ndim=2] thickness_ready = np.zeros((ende-start,Image_width),np.uint16 )
-    cdef unsigned short spalte, zeile, spalte_c, zeile_c, spalte_c_max = 1, zeile_c_max = 1
+    cdef unsigned short spalte, zeile, spalte_c, zeile_c, zeile_c_max = spalte_c_max
     cdef np.ndarray[DTYPE_t, ndim=1] intensity
     cdef np.ndarray[double,ndim=1] minima_exp
     cdef unsigned int counter=start, 

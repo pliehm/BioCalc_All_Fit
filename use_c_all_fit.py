@@ -477,8 +477,13 @@ if __name__ == '__main__':
             plt.clim(result.mean()-color_min,result.mean()+color_max)
             # plot a color bar
             plt.colorbar()
+<<<<<<< HEAD
 
             # remove "#" to show the plot after the calculation
             #plt.show()
 
+=======
+>>>>>>> jumps
 
+            # remove "#" to show the plot after the calculation
+            #plt.show()

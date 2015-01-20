@@ -45,6 +45,9 @@ use_thickness_limits = True # Enter "True" if you want to do calculation with th
 
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
 
+
+area_avrg = 2 # this number defines how many pixel are considerd for an average to guess the new thickness, e.g.: 2 means that all pixels in a range of 2 rows above, two columns to the left and the right are averaged, that makes 12px, 1 --> 4px, 2 --> 12px, 3--> 24px
+
 #############
 # Smoothing #
 #############
@@ -260,15 +263,15 @@ if __name__ == '__main__':
             p.close()
 
             # list which will contain, thickness, length of a set of wavelengths, starting position of the block --> this is all useful to have to improve speed
-            sim_waves=[]
+            thickness_len_pos=[]
 
-            # current set of wavelengths for one thickness
-            wave_block=[]
+            # current set of minima for one thickness
+            minima_block=[]
 
-            # array which contains all wave_blocks one after another
-            s_waves_arrays = []
+            # list which contains all minima_blocks arrays one after another
+            list_minima_blocks = []
 
-            # variable which defines at which position a set of wavelengths starts
+            # variable which defines at which position a set of minima starts
             position = 0
 
             # read every line of the string
@@ -283,21 +286,21 @@ if __name__ == '__main__':
                         # check word if it is a wavelengt, only append it if its in the wavelength range +- lookahead
                         if len(word)<6 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minima which are in the wave-range + lookahead_min
                             # append the wavelength to the current block of wavelengths
-                            wave_block.append(float(word))
+                            minima_block.append(float(word))
 
                 # check if the line is empty and inside the thickness range
                 if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
 
                     # append thickness, length of waveblock, position of block to a list
-                    sim_waves.append([np.uint16(thickness),np.uint16(len(wave_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
+                    thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
 
                     # append waveblock to an array
-                    s_waves_arrays.append(np.array(wave_block,dtype=np.float))
+                    list_minima_blocks.append(np.array(minima_block,dtype=np.float))
 
                     # update the current starting position of the next waveblock
-                    position += len(wave_block)
+                    position += len(minima_block)
                     # clear the waveblock to write new wavelengths into it
-                    wave_block=[]
+                    minima_block=[]
 
             print 'perform the calculations'
             # get start time for simulation to check later how long it took
@@ -335,9 +338,11 @@ if __name__ == '__main__':
 
             if multi_p == True:
 
-                def put_into_queue(start,ende,que,all_images, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit):
+                def put_into_queue(start,ende,que,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit):
 
-                    que.put(Fit.c_Fit_Pixel(start,ende,all_images, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,s_waves_arrays, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
+                    # it is weird that the arguments of the function are not the same as the arguments which are used --> list_minima_blocks is missing. But it still works
+
+                    que.put(Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit)) # calls the C-Fit-function
                     #print 'Schlange ist satt'
 
                 
@@ -357,9 +362,9 @@ if __name__ == '__main__':
                 # assign the data properly to the Processes
                 for i in range(cores):
                     if i < cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit)))
                     if i == cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit)))
+                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit)))
                 for i in range(cores):
                     Prozesse[i].start()
                     
@@ -375,6 +380,7 @@ if __name__ == '__main__':
                     #print 'joint', i
                     Prozesse[i].join()
 
+
             ##########################
             # Single-Core Processing #
             ##########################
@@ -387,8 +393,9 @@ if __name__ == '__main__':
                 ende = Image_height
 
                 # call the external cython/c++ function with all the parameters
-                result = Fit.c_Fit_Pixel(start,ende,all_images, sim_waves, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,s_waves_arrays, use_thickness_limits, thickness_limit)
+                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit)
             t2 = time.time()
+
 
 
             print t2-t1, 'seconds just for the calculation'
@@ -477,13 +484,7 @@ if __name__ == '__main__':
             plt.clim(result.mean()-color_min,result.mean()+color_max)
             # plot a color bar
             plt.colorbar()
-<<<<<<< HEAD
 
             # remove "#" to show the plot after the calculation
             #plt.show()
 
-=======
->>>>>>> jumps
-
-            # remove "#" to show the plot after the calculation
-            #plt.show()

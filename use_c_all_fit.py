@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurementes)
 
-data = ['10_new_vary']
+data = ['data']
 
 
 # chose wavelength range and step-width
@@ -161,7 +161,7 @@ if __name__ == '__main__':
             Image_mode = Img.mode 
             if Image_mode == 'RGB' or Image_mode == 'P':
                 Image_bit = '8'
-            elif Image_mode == 'I;16' or Image_mode == 'I;12':
+            elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
                 Image_bit = '16'
             else:
                 print 'Image mode is:', Img.mode

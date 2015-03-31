@@ -22,6 +22,9 @@ wave_start = 550    # [nm]
 wave_end = 750      # [nm]
 
 
+# enter a value to apply binning to run the calculation faster
+binning = 8
+
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
 
 tolerance = 1
@@ -34,17 +37,17 @@ lookahead_min = 5 # something like peak width for the minima, 5 is a good value
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_15Ag_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
+sim_file = 'Sim_0.5Cr_15Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 5000 # [nm]
-d_max= 12000 # [nm]
+d_min= 3000 # [nm]
+d_max= 11000 # [nm]
+
 
 use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see sharpe edges you might need to switch to "Fals"
 
 thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
-
 
 area_avrg = 2 # this number defines how many pixel are considerd for an average to guess the new thickness, e.g.: 2 means that all pixels in a range of 2 rows above, two columns to the left and the right are averaged, that makes 12px, 1 --> 4px, 2 --> 12px, 3--> 24px
 
@@ -58,11 +61,6 @@ area_avrg = 2 # this number defines how many pixel are considerd for an average 
 x_y_smooth = False
 # enter sigma for the gaussian smoothing
 x_y_sigma = 0.5
-
-# enter True if you want to enable this smoothing
-x_y_smooth = False
-# enter sigma for the gaussian smoothing
-x_y_sigma = 0.1
 
 
 ############
@@ -96,10 +94,11 @@ from scipy import ndimage
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 from skimage.io import imread
-from skimage.filter import gaussian_filter
+from skimage.filters import gaussian_filter
+from skimage import transform
 
 # change version of the release here which will be included in the results files
-version = 'BioCalc 2.1'
+version = 'BioCalc 2.1.1'
 
 t_a_start = time.time() # start timer for runtime measurement
 
@@ -154,12 +153,12 @@ if __name__ == '__main__':
                     break # stop the loop if an image was found
 
 
-            Image_width = Img.size[0]
-            Image_height = Img.size[1]
+            Image_width = Img.size[0]/binning
+            Image_height = Img.size[1]/binning
 
             # get colour and bit depth of image, this is important to know the range of the values (e.g. 8-bit is 0-255, 16-bit is 0-65535)
             Image_mode = Img.mode 
-            if Image_mode == 'RGB' or Image_mode == 'P':
+            if Image_mode == 'RGB' or Image_mode == 'P' or Image_mode == 'L':
                 Image_bit = '8'
             elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
                 Image_bit = '16'
@@ -171,11 +170,6 @@ if __name__ == '__main__':
             all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
             # create another empty array to hold the data for the smoothing
             all_images_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
-
-            # define function to convert the image-string (read from file) to an array
-            def image2array(Img):
-                newArr= np.fromstring(Img.tostring(), np.uint16)
-                newArr= np.reshape(newArr, (Image_height,Image_width))
 
 
             # read every image in folder and check if it is in the wavelength range --> write grey values into array
@@ -204,18 +198,18 @@ if __name__ == '__main__':
                         if Image_bit == '8':
                             Img = im.open(data_folder + '/'+folder + '/' + files[i])
                             Img = Img.convert('L')
-                            all_images[counter]=np.asarray(Img)
+                            all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
 
                         # not sure, but I think I used "imread" because it is more platform independent
                         else:
-                            all_images[counter]=imread(Img, as_grey=True)
+                            all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
 
                         # smoothing x-y direction
                         if x_y_smooth == True:
                             if Image_bit == '8':
                                 Img_s = ndimage.gaussian_filter(Img, sigma=x_y_sigma)
                             else:
-                                all_images_x_y_smooth[counter] = gaussian_filter(imread(Img_s),sigma=x_y_sigma)
+                                all_images_x_y_smooth[counter] = transform.rescale(gaussian_filter(imread(Img_s),sigma=x_y_sigma),1.0/binning,preserve_range=True)
                         counter+= 1
 
     ##################################

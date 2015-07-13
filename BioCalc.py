@@ -23,7 +23,7 @@ wave_end = 750      # [nm]
 
 
 # enter a value to apply binning to run the calculation faster
-binning = 8
+binning = 1
 
 # enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
 
@@ -33,15 +33,17 @@ tolerance = 1
 
 lookahead_min = 5 # something like peak width for the minima, 5 is a good value
 
+# set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
+enhance_resolution = 10
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_15Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
+sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 3000 # [nm]
+d_min= 4000 # [nm]
 d_max= 11000 # [nm]
 
 
@@ -129,13 +131,13 @@ if __name__ == '__main__':
 
             # make wavelength list
 
-            wave_step = 1       # [nm], this can be adjusted if you don't have an image evrey nanometer
+            wave_step = 1      # [nm], this can be adjusted if you don't have an image evrey nanometer
             
             # create an empty list which will later contain all wavelengths, e.g. 550,551,552,...,750
             waves=[]
 
             # write wavelengths into the list
-            waves=[wave_start + i*wave_step for i in xrange((wave_end-wave_start)/wave_step + 1)]
+            waves=[wave_start + i*wave_step for i in xrange(int((wave_end-wave_start)/wave_step + 1))]
 
             ###################
             # read image data #
@@ -188,11 +190,11 @@ if __name__ == '__main__':
                 # only consider files with the ending tiff, tif
                 if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
                     # check if the current file is in the wavelength range the user specified at the beginning
-                    if int(files[i][:3]) >= wave_start and int(files[i][:3]) <= wave_end:
-                        #print files[i]
+                    if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
+                        print files[i]
                         #print counter
 
-                        # assign the current image name to a variable
+                        # assign the current image name to a variable, I think this line is not needed
                         Img = data_folder + '/'+folder + '/' + files[i]
                         # check if its 8-bit, convert, load
                         if Image_bit == '8':
@@ -278,7 +280,7 @@ if __name__ == '__main__':
                     # split line into words
                     for word in thisline.split('\t'):
                         # check word if it is a wavelengt, only append it if its in the wavelength range +- lookahead
-                        if len(word)<6 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minima which are in the wave-range + lookahead_min
+                        if len(word)<7 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minima which are in the wave-range + lookahead_min
                             # append the wavelength to the current block of wavelengths
                             minima_block.append(float(word))
 
@@ -306,6 +308,13 @@ if __name__ == '__main__':
                
             # use different delta scaling for 8,12,16 bit, delta something like the peak height of the minima, it differs of course significantly for 8-bit images and 16-bit images, just because of the different range
 
+
+            # the proper delta shall be a 10th of the mean value of all images
+            new_delta = int(all_images.mean()/10)
+            # in case delta is larger than 7, take it
+            if new_delta > 7:
+                delta = new_delta
+
             # for 16 or 12 bit images do the following
             if Image_bit == '16':
                 # the proper delta shall be a 10th of the mean value of all images
@@ -318,6 +327,12 @@ if __name__ == '__main__':
             if Image_bit == '8':
                 delta = 7    
 
+            # TEST TEST TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            if enhance_resolution != 1 and delta>(4*7):
+                delta = delta/4
+            #delta = 100
+
             # calculate how much the delta should be varied in case no value is found
             delta_vary = int(delta/5-delta/20) # this has be found empirically to lead to a good fit of the minima
             print 'delta = ', delta
@@ -326,54 +341,7 @@ if __name__ == '__main__':
 ## Start calculations either with multiprocessing or single ##
 ##############################################################
 
-            #########################
-            # Multi-Core Processing #
-            #########################
-
-            if multi_p == True:
-
-                def put_into_queue(start,ende,que,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit,area_avrg):
-
-                    # it is weird that the arguments of the function are not the same as the arguments which are used --> list_minima_blocks is missing. But it still works
-
-                    que.put(Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg)) # calls the C-Fit-function
-                    #print 'Schlange ist satt'
-
-                
-                
-                # devide the rows by the core-number --> to split it equally, assing the rest to the last process
-                Zeile_Teil = Image_height/cores
-                Zeile_Rest = Image_height%cores
-
-                # start multiprocessing with queues
-
-                Prozesse = []
-                Queues = []
-
-                for i in range(cores):
-                    Queues.append(mp.Queue())
-
-                # assign the data properly to the Processes
-                for i in range(cores):
-                    if i < cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary, use_thickness_limits, thickness_limit,area_avrg)))
-                    if i == cores-1:
-                        Prozesse.append(mp.Process(target=put_into_queue,args=(i*Zeile_Teil,(i+1)*Zeile_Teil+Zeile_Rest,Queues[i],all_images[:,(i*Zeile_Teil):((i+1)*Zeile_Teil),:], thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta, delta_vary,use_thickness_limits, thickness_limit,area_avrg)))
-                for i in range(cores):
-                    Prozesse[i].start()
-                    
-
-                # initialise array for thicknesses
-                result = np.ndarray((0,Image_width),dtype=np.uint16)
-
-                for i in range(cores):
-                    #print 'queuet', i
-                    result = np.append(result,Queues[i].get(),axis=0)
-
-                for i in range(cores):
-                    #print 'joint', i
-                    Prozesse[i].join()
-
+            
 
             ##########################
             # Single-Core Processing #
@@ -387,7 +355,7 @@ if __name__ == '__main__':
                 ende = Image_height
 
                 # call the external cython/c++ function with all the parameters
-                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg)
+                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
             t2 = time.time()
 
 
@@ -413,10 +381,10 @@ if __name__ == '__main__':
             
             # generate a header with all parameters
             HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
-            if x_y_smooth == True:
-                HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
-            if lambda_smooth == True:
-                HEADER+= 'lambda smoothing done with sigma = ' + str(lambda_sigma) + '\n'
+            #if x_y_smooth == True:
+            #    HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
+            #if lambda_smooth == True:
+            #    HEADER+= 'lambda smoothing done with sigma = ' + str(lambda_sigma) + '\n'
 
             HEADER+= '\n'
 
@@ -437,7 +405,7 @@ if __name__ == '__main__':
             file_name = data_folder + '_' + folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
 
             # use numpy function to save array to file, '0' and not '-' are used for missing values
-            np.savetxt(data_folder + '/' + file_name,result,fmt='%d',header=HEADER )
+            np.savetxt(data_folder + '/' + file_name,result,fmt='%d')#,header=HEADER )
 
             ######################################################################
             # script to replace a certain string or string combination in a file #

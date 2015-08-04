@@ -78,13 +78,13 @@ cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] arra
                 if _abs(sim_minima_blocks[position] - exp_waves[0]) > _abs(sim_minima_blocks[position+len_block-1]-exp_waves[-1]):
                     for k in xrange(L_exp_waves):
                         summe+= _abs(sim_minima_blocks[position+k+1]-exp_waves[k])
-                        if summe/L_exp_waves > tolerance:
+                        if summe/(L_exp_waves + 1) > tolerance:
                             breaker = 1
                             break
                     if breaker == 1:
                         continue        
                     sim_min_waves[0].append(thickness[i])
-                    sim_min_waves[1].append(summe/float(L_exp_waves))
+                    sim_min_waves[1].append(summe/float(L_exp_waves+1))
                     continue
                 else:
                     for k in xrange(L_exp_waves):

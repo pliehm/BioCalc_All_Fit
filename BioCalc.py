@@ -34,7 +34,7 @@ tolerance = 1
 lookahead_min = 5 # something like peak width for the minima, 5 is a good value
 
 # set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
-enhance_resolution = 10
+enhance_resolution = 5
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure

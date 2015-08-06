@@ -11,12 +11,16 @@
 # the folder with the image files MUST be in another folder (its name has to be entered here)
 # e.g. you have 5 folders with images: 1,2,3,4,5 --> all these 5 folders have to be e.g. in a folder
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
-# in this list (e.g. for 3 different long-time measurementes)
+# in this list (e.g. for 3 different long-time measurementes). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['data']
+data = ['test_data']
 
+# enter name of simulation_file, copy and paste the file name of the
+# simulation file corresponding to your layer structure
 
-# chose wavelength range and step-width
+sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
+
+# chose wavelength range
 
 wave_start = 550    # [nm]
 wave_end = 750      # [nm]
@@ -25,55 +29,39 @@ wave_end = 750      # [nm]
 # enter a value to apply binning to run the calculation faster
 binning = 1
 
-# enter average deviation of experiment to simulation in nanometer, "1" is a good value to start
-
-tolerance = 1
-
-# define parameters for minima detection  
-
-lookahead_min = 5 # something like peak width for the minima, 5 is a good value
-
-# set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
-enhance_resolution = 5
-
-# enter name of simulation_file, copy and paste the file name of the
-# simulation file corresponding to your layer structure
-
-sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
 d_min= 4000 # [nm]
 d_max= 11000 # [nm]
 
+####################
+# Advanced options #
+####################
 
-use_thickness_limits = True # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see sharpe edges you might need to switch to "Fals"
+# enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
 
-thickness_limit = 50 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit)
+tolerance = 1
 
-area_avrg = 2 # this number defines how many pixel are considerd for an average to guess the new thickness, e.g.: 2 means that all pixels in a range of 2 rows above, two columns to the left and the right are averaged, that makes 12px, 1 --> 4px, 2 --> 12px, 3--> 24px
+# define parameters for minima detection  
 
-#############
-# Smoothing #
-#############
+# something like peak width for the minima, 5 is a good value
+# should be larger for thinner cavities and smaller for bigger cavities (maybe FSR/4)
 
-# Smoothing the wavelength images does not improve the all_imags that much, not really needed for the moment
+lookahead_min = 5 
 
-# enter True if you want to enable this smoothing
-x_y_smooth = False
-# enter sigma for the gaussian smoothing
-x_y_sigma = 0.5
+# set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
+# 5 is a good value, 10 does not improve the result that much
+enhance_resolution = 5
 
+ # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see artifacts try to use "False"
+use_thickness_limits = True
 
-############
-# Plotting #
-############
+# [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit) --> this has to be smaller than 230nm/2, better 230nm/4
+thickness_limit = 50 
 
-# parameters for printing
-# color map is calculated like (mean_thickness - color_min, mean_thickness + color_max) 
-
-color_min = 500
-color_max = 500
+# this number defines how many pixel are considerd for an average to guess the new thickness, e.g.: 2 means that all pixels in a range of 2 rows above, two columns to the left and the right are averaged, that makes 12px, 1 --> 4px, 2 --> 12px, 3--> 24px
+area_avrg = 2 
 
 
 ############################
@@ -86,367 +74,290 @@ color_max = 500
 #### start of the program ###
 #############################
 
-# load all the python modules needed
-import cython_all_fit as Fit # import self-written cython code
+# load all the python modules needed, they should all be part of the anaconda python distribution
+# import self-written cython code
+import cython_all_fit as Fit 
 import numpy as np
 import time
 import os 
-import Image as im
-from scipy import ndimage
-import multiprocessing as mp
+from PIL import Image as im
 import matplotlib.pyplot as plt
 from skimage.io import imread
-from skimage.filters import gaussian_filter
 from skimage import transform
 
 # change version of the release here which will be included in the results files
-version = 'BioCalc 2.1.1'
+version = 'BioCalc 2.2.0'
 
 t_a_start = time.time() # start timer for runtime measurement
 
 
-# make sure that this part only runs as main process, not subprocess, thats important for the multiprocessing
-if __name__ == '__main__':
 
-    # for every folder with images in the data folder do:
-    for data_folder in data:
+# for every folder with images in the data folder do:
+for data_folder in data:
 
-        # make a list of the wavelength images in the folder
-        folder_list = os.listdir(data_folder)
+    # make a list of the wavelength images in the folder
+    folder_list = os.listdir(data_folder)
 
-        # sort the list of folders
-        folder_list.sort()
+    # sort the list of folders
+    folder_list.sort()
 
-        # for all folders in the list do
-        for folder in folder_list:
-            # enter number of cpu cores, this has to be an integer number!
-            # number of physical cores is a good start, but you can try with a larger as well
+    # for all folders in the list do
+    for folder in folder_list:
 
-            # True for multiprocessing, False for single core (Windows), should work for linux and osx, but not for windows --> this cuts your images in blocks which are treated seperately
-            multi_p = False   
-            # number of processes you want to use, should not exeed the number of physical cores
-            cores = 4
+        # for the maxima --> should not be larger than lookahead_min
+        lookahead_max = lookahead_min-1 
 
-            lookahead_max = lookahead_min-1 # for the maxima --> should not be larger than lookahead_min
+        # make wavelength list
 
-            # make wavelength list
+        # [nm], this can be adjusted if you don't have an image every nanometer
+        wave_step = 1      
+        
+        # create an empty list which will later contain all wavelengths, e.g. 550,551,552,...,750
+        waves=[]
 
-            wave_step = 1      # [nm], this can be adjusted if you don't have an image evrey nanometer
-            
-            # create an empty list which will later contain all wavelengths, e.g. 550,551,552,...,750
-            waves=[]
+        # write wavelengths into the list
+        waves=[wave_start + i*wave_step for i in xrange(int((wave_end-wave_start)/wave_step + 1))]
 
-            # write wavelengths into the list
-            waves=[wave_start + i*wave_step for i in xrange(int((wave_end-wave_start)/wave_step + 1))]
+        ###################
+        # read image data #
+        ###################
 
-            ###################
-            # read image data #
-            ###################
-
-            # make and sort list of file in the folder
-            files = os.listdir(data_folder+'/'+folder)
-            files.sort()
-            
-            # get size, bit-depth of the images
-            for i in range(len(files)):
-                # only consider files with the ending tiff, tif
-                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif': 
-                    Img=im.open(data_folder + '/'+folder + '/' + files[i])
-                    break # stop the loop if an image was found
+        # make and sort list of file in the folder
+        files = os.listdir(data_folder+'/'+folder)
+        files.sort()
+        
+        # get size, bit-depth of the images
+        for i in range(len(files)):
+            # only consider files with the ending tiff, tif
+            if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif': 
+                Img=im.open(data_folder + '/'+folder + '/' + files[i])
+                break # stop the loop if an image was found
 
 
-            Image_width = Img.size[0]/binning
-            Image_height = Img.size[1]/binning
+        # calculate dimensions of the images, this will be needed later on
+        Image_width = Img.size[0]/binning
+        Image_height = Img.size[1]/binning
 
-            # get colour and bit depth of image, this is important to know the range of the values (e.g. 8-bit is 0-255, 16-bit is 0-65535)
-            Image_mode = Img.mode 
-            if Image_mode == 'RGB' or Image_mode == 'P' or Image_mode == 'L':
-                Image_bit = '8'
-            elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
-                Image_bit = '16'
-            else:
-                print 'Image mode is:', Img.mode
-                Image_bit = '16B'
-  
-            # create an empty array which will contain all image data 
-            all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
-            # create another empty array to hold the data for the smoothing
-            all_images_x_y_smooth = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+        # get colour and bit depth of image, this is important to know the range of the values (e.g. 8-bit is 0-255, 16-bit is 0-65535)
+        Image_mode = Img.mode 
+        if Image_mode == 'RGB' or Image_mode == 'P' or Image_mode == 'L':
+            Image_bit = '8'
+        elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
+            Image_bit = '16'
+        else:
+            print 'Image mode is:', Img.mode
+            Image_bit = '16B'
 
+        # create an empty array which will contain all image data 
+        all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+       
 
-            # read every image in folder and check if it is in the wavelength range --> write grey values into array
-            
-            # set a counter to check how many images have been processed
-            counter=0
-            # print some information for the user what is done
-            print 'reading images from folder: ', folder
-            if x_y_smooth == True:
-                print 'smoothing of every wavelength image with sigma = ', x_y_sigma, ' before thickness calculation'
-            else:
-                print 'no smoothing of the wavelength images'    
+        # read every image in folder and check if it is in the wavelength range --> write grey values into array
+        
+        # set a counter to check how many images have been processed
+        counter=0
 
-            # start iterating over the files
-            for i in xrange(len(files)):
-                # only consider files with the ending tiff, tif
-                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
-                    # check if the current file is in the wavelength range the user specified at the beginning
-                    if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
-                        print files[i]
-                        #print counter
+        print 'reading images from folder: ', folder
 
-                        # assign the current image name to a variable, I think this line is not needed
+        # start iterating over the files
+        for i in xrange(len(files)):
+            # only consider files with the ending tiff, tif
+            if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
+                # check if the current file is in the wavelength range the user specified at the beginning
+                if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
+                    print files[i]
+                    #print counter
+
+                    # check if its 8-bit, convert, load
+                    if Image_bit == '8':
+                        Img = im.open(data_folder + '/'+folder + '/' + files[i])
+                        Img = Img.convert('L')
+                        all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
+
+                    # read all other formats with imread from skimage
+                    else:
                         Img = data_folder + '/'+folder + '/' + files[i]
-                        # check if its 8-bit, convert, load
-                        if Image_bit == '8':
-                            Img = im.open(data_folder + '/'+folder + '/' + files[i])
-                            Img = Img.convert('L')
-                            all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
+                        all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
 
-                        # not sure, but I think I used "imread" because it is more platform independent
-                        else:
-                            all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
+                    counter+= 1
 
-                        # smoothing x-y direction
-                        if x_y_smooth == True:
-                            if Image_bit == '8':
-                                Img_s = ndimage.gaussian_filter(Img, sigma=x_y_sigma)
-                            else:
-                                all_images_x_y_smooth[counter] = transform.rescale(gaussian_filter(imread(Img_s),sigma=x_y_sigma),1.0/binning,preserve_range=True)
-                        counter+= 1
-
-    ##################################
-    ##### Section for smoothing ######
-    ##################################
-
-            # do you want to smooth in the direction of the wavelength? "z-direction" of the stack    
-            lambda_smooth = False
-            lambda_sigma = 1
-
-            # if x_y smoothing was applied, use the smoothed array
-            if x_y_smooth == True:
-                all_images = all_images_x_y_smooth.copy()
-
-            # if you want to smooth in wavelength direction, do the following:
-            if lambda_smooth == True:
-                print 'smoothing over wavelength with sigma = ', lambda_sigma
-                for zeile in range(Image_height):
-                    #print zeile
-                    for spalte in range(Image_width):
-                        if Image_bit == '8':
-                            # smooth in wavelength direction
-                            all_images[:,zeile,spalte] = ndimage.gaussian_filter1d(all_images[:,zeile,spalte],lambda_sigma)
-                        else:
-                            # smooth in wavelength direction
-                            all_images[:,zeile,spalte] = gaussian_filter(all_images[:,zeile,spalte],sigma = lambda_sigma)
-                        
+#######################################################################
+# Read the simulation file and get the minima for the thickness range #
+#######################################################################
 
 
-    ########################################################################
-    # Read the simulation file and get the minima for the thickness range #
-    ########################################################################
+        # read simulation file 
+        print 'read simulated data'
+
+        # open file
+        p= open('Simulated_minima/' + sim_file,'r')
+
+        # read the whole content of the file into a string
+        string=p.read()
+
+        # close the file
+        p.close()
+
+        # list which will contain, thickness, length of a set of wavelengths, starting position of the block --> this is all useful to have to improve speed
+        thickness_len_pos=[]
+
+        # current set of minima for one thickness (temporary list)
+        minima_block=[]
+
+        # list which contains all minima_blocks arrays one after another --> in combination with the list thickness_len_pos one has all the data needed
+        list_all_minima_blocks = []
+
+        # variable which defines at which position a set of minima starts
+        position = 0
+
+        # Start reading the file
+
+        # read every line of the string
+        for thisline in string.split('\n'):
+            # check if the current line contains a thickness
+            if ('\t' in thisline) == False and len(thisline) != 0:
+                thickness = thisline
+            # check if this is a line with no thickness, but one is still in the thickness range
+            if ('\t' in thisline) == True and int(thickness) >= d_min and int(thickness) <= d_max:
+                # split line into words
+                for word in thisline.split('\t'):
+                    # check word if it is a wavelength, only append it if its in the wavelength range +- lookahead, len(word)<7 assures that word is a wavelength and not the reflectivity value
+                    if len(word)<7 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: 
+                        # append the wavelength to the current block of wavelengths
+                        minima_block.append(float(word))
+
+            # check if the line is empty and inside the thickness range
+            if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
+
+                # append thickness, length of waveblock, position of block to a list, convert to 16 or 32 bit, that is important to assure that the values are not corrupted because they are outside the right data range
+                thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) 
+
+                # append waveblock as an array (faster data handling later on)
+                list_all_minima_blocks.append(np.array(minima_block,dtype=np.float))
+
+                # update the current starting position of the next waveblock
+                position += len(minima_block)
+                # clear the waveblock to write new wavelengths into it
+                minima_block=[]
 
 
-            # read simulation file 
-            print 'read simulated data'
 
-            # open file
-            p= open('Simulated_minima/' + sim_file,'r')
-
-            # read the whole content of the file into a string
-            string=p.read()
-
-            # close the file
-            p.close()
-
-            # list which will contain, thickness, length of a set of wavelengths, starting position of the block --> this is all useful to have to improve speed
-            thickness_len_pos=[]
-
-            # current set of minima for one thickness
-            minima_block=[]
-
-            # list which contains all minima_blocks arrays one after another
-            list_minima_blocks = []
-
-            # variable which defines at which position a set of minima starts
-            position = 0
-
-            # read every line of the string
-            for thisline in string.split('\n'):
-                # check if the current line contains a thickness
-                if ('\t' in thisline) == False and len(thisline) != 0:
-                    thickness = thisline
-                # check if this is a line with no thickness, but one is still in the thickness range
-                if ('\t' in thisline) == True and int(thickness) >= d_min and int(thickness) <= d_max:
-                    # split line into words
-                    for word in thisline.split('\t'):
-                        # check word if it is a wavelengt, only append it if its in the wavelength range +- lookahead
-                        if len(word)<7 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: # use only minima which are in the wave-range + lookahead_min
-                            # append the wavelength to the current block of wavelengths
-                            minima_block.append(float(word))
-
-                # check if the line is empty and inside the thickness range
-                if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
-
-                    # append thickness, length of waveblock, position of block to a list
-                    thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
-
-                    # append waveblock to an array
-                    list_minima_blocks.append(np.array(minima_block,dtype=np.float))
-
-                    # update the current starting position of the next waveblock
-                    position += len(minima_block)
-                    # clear the waveblock to write new wavelengths into it
-                    minima_block=[]
-
-            print 'perform the calculations'
-            # get start time for simulation to check later how long it took
-            t1 = time.time()
-
-####################################################
-## Find new delta to deal with different dynamics ##
-####################################################
-               
-            # use different delta scaling for 8,12,16 bit, delta something like the peak height of the minima, it differs of course significantly for 8-bit images and 16-bit images, just because of the different range
+###############################################################################
+## Find new delta (minima finding algorithm) to deal with different dynamics ##
+###############################################################################
+           
+        # use different delta scaling for 8,12,16 bit, delta something like the peak height of the minima, it differs of course significantly for 8-bit images and 16-bit images, just because of the different range
 
 
+        # the proper delta shall be a 10th of the mean value of all images
+        new_delta = int(all_images.mean()/10)
+        # in case delta is larger than 7, take it
+        if new_delta > 7:
+            delta = new_delta
+
+        # for 16 or 12 bit images do the following
+        if Image_bit == '16':
             # the proper delta shall be a 10th of the mean value of all images
             new_delta = int(all_images.mean()/10)
             # in case delta is larger than 7, take it
             if new_delta > 7:
                 delta = new_delta
 
-            # for 16 or 12 bit images do the following
-            if Image_bit == '16':
-                # the proper delta shall be a 10th of the mean value of all images
-                new_delta = int(all_images.mean()/10)
-                # in case delta is larger than 7, take it
-                if new_delta > 7:
-                    delta = new_delta
+        # for 8-bit images just take a delta of 7 as this is sufficient
+        if Image_bit == '8':
+            delta = 7    
 
-            # for 8-bit images just take a delta of 7 as this is sufficient
-            if Image_bit == '8':
-                delta = 7    
+        # TEST TEST TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # since the data is smoothed there is less noise and the delta can be chosen smaller
+        # does this work for all values for enhanced_resolution equally??
+        if enhance_resolution != 1 and delta>(4*7):
+            delta = delta/4
+        #delta = 100
 
-            # TEST TEST TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # calculate how much the delta should be varied in case no value is found
+        # this has been found empirically to lead to a good fit of the minima
+        delta_vary = int(delta/5-delta/20)
+        print 'delta = ', delta
 
-            if enhance_resolution != 1 and delta>(4*7):
-                delta = delta/4
-            #delta = 100
+#######################
+## Start calculations #
+#######################
 
-            # calculate how much the delta should be varied in case no value is found
-            delta_vary = int(delta/5-delta/20) # this has be found empirically to lead to a good fit of the minima
-            print 'delta = ', delta
+        
+        # start row
+        start = 0
+        # last row
+        ende = Image_height
 
-##############################################################
-## Start calculations either with multiprocessing or single ##
-##############################################################
+        print 'perform the calculations'
+        # get start time for simulation to check later how long it took
+        t1 = time.time()
 
-            
-
-            ##########################
-            # Single-Core Processing #
-            ##########################
-
-            if multi_p == False:
-                # define size of array
-                # start row
-                start = 0
-                # last row
-                ende = Image_height
-
-                # call the external cython/c++ function with all the parameters
-                result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
-            t2 = time.time()
+        # call the external cython/c++ function with all the parameters
+        result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
+       
+        t2 = time.time()
 
 
 
-            print t2-t1, 'seconds just for the calculation'
+        print t2-t1, 'seconds just for the calculation'
 
 
 
-            ###########################
-            # count not fitted values #
-            ###########################
+        ###########################
+        # count not fitted values #
+        ###########################
 
-            not_fitted = Image_height*Image_width - np.count_nonzero(result)
-            not_fitted_percent = 100.0/(Image_height*Image_width)*not_fitted
-            print 'not fitted values',not_fitted
-            print 'in percent:', not_fitted_percent
+        not_fitted = Image_height*Image_width - np.count_nonzero(result)
+        not_fitted_percent = 100.0/(Image_height*Image_width)*not_fitted
+        print 'not fitted values',not_fitted
+        print 'in percent:', not_fitted_percent
 
-            ######################
-            # Write data to file #
-            ######################
+        ######################
+        # Write data to file #
+        ######################
 
-            print 'write data to file'
-            
-            # generate a header with all parameters
-            HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
-            #if x_y_smooth == True:
-            #    HEADER+= 'x_y_smoothing done with sigma = ' + str(x_y_sigma) + '\n'
-            #if lambda_smooth == True:
-            #    HEADER+= 'lambda smoothing done with sigma = ' + str(lambda_sigma) + '\n'
+        print 'write data to file'
+        
+        # generate a header with all parameters
+        HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
 
-            HEADER+= '\n'
+        HEADER+= '\n'
 
-            # If filename should be different for calculations with smoothing
-            # if x_y_smooth == True and lambda_smooth == False:
-            #     file_name = data_folder + '_' +folder + time.strftime("_%Y%m%d_%H%M%S")+'_x_y_sigma_' + str(x_y_sigma) + '_smoothed.txt'
-                
-            # if lambda_smooth == True and x_y_smooth == False:
-            #     file_name = data_folder + '_' + folder + time.strftime("_%Y%m%d_%H%M%S")+'_lambda_sigma_' + str(lambda_sigma) + '_smoothed.txt'
+        # generate a useful filename
+        file_name = data_folder + '_' + folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
 
-            # if lambda_smooth == True and x_y_smooth == True:
-            #     file_name = data_folder + '_' + folder +  time.strftime("_%Y%m%d_%H%M%S")+'_x_y_sigma_' + str(x_y_sigma) + '_lambda_sigma_' +str(lambda_sigma) + '_smoothed.txt'
-
-            # if lambda_smooth == False and x_y_smooth == False: 
-            #     file_name = data_folder + '_' + folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
-
-            # generate a useful filename
-            file_name = data_folder + '_' + folder + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
-
-            # use numpy function to save array to file, '0' and not '-' are used for missing values
-            np.savetxt(data_folder + '/' + file_name,result,fmt='%d')#,header=HEADER )
-
-            ######################################################################
-            # script to replace a certain string or string combination in a file #
-            ######################################################################
-
-            #t_replace_1 = time.time()
-
-            # do it twice because 0 0 would not be - - but - 0 since the empty character before the second 0 has already been read
-            for i in range(2):
-                p = open(data_folder + '/' + file_name,'r')
-
-                string = p.read()
-
-                p.close()
-
-                string = string.replace(' 0 ', ' - ')
-                string = string.replace('\n'+'0 ', '\n'+'- ')
-                string = string.replace(' 0'+'\n', ' -'+'\n')
-
-                p = open(data_folder + '/' + file_name,'w')
-
-                p.write(string)
-
-                p.close()
-            #print (time.time()-t_replace_1), ' seconds for replaceing 0 with -'
-            print (time.time()-t_a_start), ' seconds for the whole program'
+        # better way, no need to replace stuff afterwards:
+        #convert result to float to insert nan
+        result = result.astype(np.float)
+        # replace "0" with "nan"
+        result[result==0] = np.nan
+        # use numpy function to save array to file
+        # The Header is currently not written into the file, just uncomment the last part and remove one of the brackets
+        np.savetxt(data_folder + '/' + file_name,result,fmt='%0.0f',header=HEADER )
 
 
-            ##############
-            # plot datta #
-            ##############
+        print (time.time()-t_a_start), ' seconds for the whole program'
 
-            # make a new figure
-            plt.figure(folder)
-            # create plot of the results
-            plt.imshow(result)
-            # set the color scale to the limits provided
-            plt.clim(result.mean()-color_min,result.mean()+color_max)
-            # plot a color bar
-            plt.colorbar()
 
-            # remove "#" to show the plot after the calculation
-            #plt.show()
+        ##############
+        # plot datta #
+        ##############
+
+        # parameters for printing
+        # color map is calculated like (mean_thickness - color_min, mean_thickness + color_max) 
+
+        color_min = 500
+        color_max = 500
+        # make a new figure
+        plt.figure(folder)
+        # create plot of the results
+        plt.imshow(result)
+        # set the color scale to the limits provided
+        plt.clim(np.nanmean(result)-color_min,np.nanmean(result)+color_max)
+        # plot a color bar
+        plt.colorbar()
+
+        # remove "#" to show the plot after the calculation
+        #plt.show()
 

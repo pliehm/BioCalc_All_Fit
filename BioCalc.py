@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurementes). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['test_data']
+data = ['data']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
@@ -22,7 +22,7 @@ sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
 # chose wavelength range
 
-wave_start = 550    # [nm]
+wave_start = 600    # [nm]
 wave_end = 750      # [nm]
 
 
@@ -230,7 +230,7 @@ for data_folder in data:
             if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
 
                 # append thickness, length of waveblock, position of block to a list, convert to 16 or 32 bit, that is important to assure that the values are not corrupted because they are outside the right data range
-                thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) 
+                thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
 
                 # append waveblock as an array (faster data handling later on)
                 list_all_minima_blocks.append(np.array(minima_block,dtype=np.float))
@@ -272,6 +272,7 @@ for data_folder in data:
         # does this work for all values for enhanced_resolution equally??
         if enhance_resolution != 1 and delta>(4*7):
             delta = delta/4
+        
         #delta = 100
 
         # calculate how much the delta should be varied in case no value is found

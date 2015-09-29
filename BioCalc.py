@@ -15,16 +15,23 @@
 
 data = ['data']
 
+# choose if the imgages are all in one tiff stack or in seperate files (seperate files was how we used to have it, tiff stack is new but will make data transfer faster)
+
+tiff_stack = True
+
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
 sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
 
-# chose wavelength range
-
-wave_start = 600    # [nm]
+# chose wavelength range for calculation
+wave_start = 550    # [nm]
 wave_end = 750      # [nm]
 
+# enter wavelength range of stack (only needed if tiff_stack = True)
+
+stack_wave_start = 550 # [nm]
+stack_wave_end = 750 # [nm]
 
 # enter a value to apply binning to run the calculation faster
 binning = 1
@@ -126,60 +133,89 @@ for data_folder in data:
         files = os.listdir(data_folder+'/'+folder)
         files.sort()
         
-        # get size, bit-depth of the images
-        for i in range(len(files)):
-            # only consider files with the ending tiff, tif
-            if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif': 
-                Img=im.open(data_folder + '/'+folder + '/' + files[i])
-                break # stop the loop if an image was found
+
+        # check if the images should be read from a tiff stack or from single images
+        if tiff_stack == False:
+            # get size, bit-depth of the images
+            for i in range(len(files)):
+                # only consider files with the ending tiff, tif
+                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif': 
+                    Img=im.open(data_folder + '/'+folder + '/' + files[i])
+                    break # stop the loop if an image was found
 
 
-        # calculate dimensions of the images, this will be needed later on
-        Image_width = Img.size[0]/binning
-        Image_height = Img.size[1]/binning
+            # calculate dimensions of the images, this will be needed later on
+            Image_width = Img.size[0]/binning
+            Image_height = Img.size[1]/binning
 
-        # get colour and bit depth of image, this is important to know the range of the values (e.g. 8-bit is 0-255, 16-bit is 0-65535)
-        Image_mode = Img.mode 
-        if Image_mode == 'RGB' or Image_mode == 'P' or Image_mode == 'L':
-            Image_bit = '8'
-        elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
+            # get colour and bit depth of image, this is important to know the range of the values (e.g. 8-bit is 0-255, 16-bit is 0-65535)
+            Image_mode = Img.mode 
+            if Image_mode == 'RGB' or Image_mode == 'P' or Image_mode == 'L':
+                Image_bit = '8'
+            elif Image_mode == 'I;16' or Image_mode == 'I;12' or Image_mode=='I;16B':
+                Image_bit = '16'
+            else:
+                print 'Image mode is:', Img.mode
+                Image_bit = '16B'
+
+            # create an empty array which will contain all image data 
+            all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+           
+
+            # read every image in folder and check if it is in the wavelength range --> write grey values into array
+            
+            # set a counter to check how many images have been processed
+            counter=0
+
+            print 'reading images from folder: ', folder
+
+            # start iterating over the files
+            for i in xrange(len(files)):
+                # only consider files with the ending tiff, tif
+                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
+                    # check if the current file is in the wavelength range the user specified at the beginning
+                    if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
+                        print files[i]
+                        #print counter
+
+                        # check if its 8-bit, convert, load
+                        if Image_bit == '8':
+                            Img = im.open(data_folder + '/'+folder + '/' + files[i])
+                            Img = Img.convert('L')
+                            all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
+
+                        # read all other formats with imread from skimage
+                        else:
+                            Img = data_folder + '/'+folder + '/' + files[i]
+                            all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
+
+                        counter+= 1
+
+        if tiff_stack == True:
+            print 'reading images from folder: ', folder
+
+            # find filename for stack --> only on file per folder allowed
+            for i in xrange(len(files)):
+                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
+                    stack_name = files[i]
+                    break
+
+            # use imread to load multipage tiff
+            stack = imread(data_folder + '/'+folder + '/' + stack_name)
+
+            # calculate dimensions of the images, this will be needed later on
+            Image_width = len(stack[0][0])/binning
+            Image_height = len(stack[0])/binning
+
+            # create an empty array which will contain all image data 
+            all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+
+            # write image stack to numpy array
+            for i in range(len(all_images)):
+                all_images[i]=transform.rescale(stack[i+(wave_start-stack_wave_start)],1.0/binning,preserve_range=True).round().astype(np.uint16)
+
+            # bit depth
             Image_bit = '16'
-        else:
-            print 'Image mode is:', Img.mode
-            Image_bit = '16B'
-
-        # create an empty array which will contain all image data 
-        all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
-       
-
-        # read every image in folder and check if it is in the wavelength range --> write grey values into array
-        
-        # set a counter to check how many images have been processed
-        counter=0
-
-        print 'reading images from folder: ', folder
-
-        # start iterating over the files
-        for i in xrange(len(files)):
-            # only consider files with the ending tiff, tif
-            if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
-                # check if the current file is in the wavelength range the user specified at the beginning
-                if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
-                    print files[i]
-                    #print counter
-
-                    # check if its 8-bit, convert, load
-                    if Image_bit == '8':
-                        Img = im.open(data_folder + '/'+folder + '/' + files[i])
-                        Img = Img.convert('L')
-                        all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
-
-                    # read all other formats with imread from skimage
-                    else:
-                        Img = data_folder + '/'+folder + '/' + files[i]
-                        all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
-
-                    counter+= 1
 
 #######################################################################
 # Read the simulation file and get the minima for the thickness range #

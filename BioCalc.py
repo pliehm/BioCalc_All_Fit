@@ -15,18 +15,18 @@
 
 data = ['data']
 
-# choose if the imgages are all in one tiff stack or in seperate files (seperate files was how we used to have it, tiff stack is new but will make data transfer faster)
-
-tiff_stack = True
-
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_RT601_15Au_500_760nm.txt'
+sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_15Au_500_760nm_small_steps.txt'
 
 # chose wavelength range for calculation
-wave_start = 550    # [nm]
-wave_end = 750      # [nm]
+wave_start = 620    # [nm]
+wave_end = 660      # [nm]
+
+# choose if the imgages are all in one tiff stack or in seperate files (seperate files was how we used to have it, tiff stack is new but will make data transfer faster)
+
+tiff_stack = True
 
 # enter wavelength range of stack (only needed if tiff_stack = True)
 
@@ -45,6 +45,14 @@ d_max= 11000 # [nm]
 ####################
 # Advanced options #
 ####################
+
+# one minimum fit option --> only the last fitted minimum in the wavelength range will be considered and fitted
+
+one_minimum_fit = True
+# guess the thickness at a certain position
+
+init_guess = 8350#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
+
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
 
@@ -83,7 +91,8 @@ area_avrg = 2
 
 # load all the python modules needed, they should all be part of the anaconda python distribution
 # import self-written cython code
-import cython_all_fit as Fit 
+import cython_all_fit as Fit
+import cython_all_fit_one_minimum as Fit_one  
 import numpy as np
 import time
 import os 
@@ -330,8 +339,14 @@ for data_folder in data:
         # get start time for simulation to check later how long it took
         t1 = time.time()
 
-        # call the external cython/c++ function with all the parameters
-        result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
+        if one_minimum_fit == True:
+            
+            # call the external one minimum cython/c++ function with all the parameters
+            result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution)
+        else:
+
+            # call the external cython/c++ function with all the parameters
+            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
        
         t2 = time.time()
 

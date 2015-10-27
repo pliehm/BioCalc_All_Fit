@@ -97,7 +97,7 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
 # function to get minima of the intensity profile array #
 #########################################################
 
-cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0,unsigned short b=10):
+cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0,unsigned short enhanced_resolution=10,unsigned short average_window=5):
     
     # define output container
     #cdef list max_peaks=[]
@@ -128,17 +128,15 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 #
 
 
-    if b != 1:
+    if enhanced_resolution != 1:
 
         ################################################
         ### Interpolate data from 1nm to 0.1nm steps ###
         ################################################
 
-        for bla in range(1):
-            x_interp = np.linspace(x_axis[0],x_axis[-1],num=int((len(x_axis)-1)*b+1))
+        x_interp = np.linspace(x_axis[0],x_axis[-1],num=int((len(x_axis)-1)*enhanced_resolution+1))
 
-        for bla in range(1):
-            y_interp = np.interp(x_interp,x_axis,y_axis)
+        y_interp = np.interp(x_interp,x_axis,y_axis)
 
         #print x_interp
         #print y_interp
@@ -154,19 +152,15 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 
         #plt.plot(x_axis,y_axis)
 
-        window_len = 5*b # this needs to be checked, maybe it can be smaller or has to be larger
+        window_len = average_window*enhanced_resolution # this needs to be checked, maybe it can be smaller or has to be larger
 
-        for bla in range(1):
-            s=np.r_[abs(2*y_interp[0]-y_interp[window_len:1:-1]), y_interp, abs(2*y_interp[-1]-y_interp[-1:-window_len:-1])]
+        s=np.r_[abs(2*y_interp[0]-y_interp[window_len:1:-1]), y_interp, abs(2*y_interp[-1]-y_interp[-1:-window_len:-1])]
 
         #print s
-        for bla in range(1):
-            w = np.ones(window_len,'d')/window_len
-        for bla in range(1):
-            y_temp = np.convolve(w, s, mode='same')
+        w = np.ones(window_len,'d')/window_len
+        y_temp = np.convolve(w, s, mode='same')
 
-        for bla in range(1):
-            y_axis_list = y_temp[window_len-1:-window_len+1].tolist()
+        y_axis_list = y_temp[window_len-1:-window_len+1].tolist()
 
         x_axis= x_interp.tolist()
 
@@ -261,7 +255,7 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 
 # the following parameters are passed to the function:
 # start wavelength, end wavelength, all images, list of thickness/blocklength/position,list of waves, tolerance, lookahead_min, lookahead_max, delta, delta variations, minima blocks, thickness limits in use?, thickness limit, 
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short init_guess, unsigned short b):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short init_guess, unsigned short enhanced_resolution, unsigned short average_window):
 
     ########################################
     # definition of all the variable types #
@@ -414,7 +408,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 
                 # find the minima in the profile
 
-                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*b,lookahead_max*b, delta,b),dtype=np.float)
+                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhanced_resolution,lookahead_max*enhanced_resolution, delta,enhanced_resolution,average_window),dtype=np.float)
 
                 if len(minima_exp)>0:
                     minima_ready[row][column] = minima_exp[0]

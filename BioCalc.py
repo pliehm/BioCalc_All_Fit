@@ -11,20 +11,20 @@
 # the folder with the image files MUST be in another folder (its name has to be entered here)
 # e.g. you have 5 folders with images: 1,2,3,4,5 --> all these 5 folders have to be e.g. in a folder
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
-# in this list (e.g. for 3 different long-time measurementes). But you can also run different instances of the program to make use of multiple cores.
+# in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['data']
+data = ['different_slits_small']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
 
-sim_file = 'Sim_0.5Cr_10Au_50SiO2_Elastomer_15Au_500_760nm_small_steps.txt'
+sim_file = '2015_10_26_standard.txt'
 
 # chose wavelength range for calculation
-wave_start = 620    # [nm]
-wave_end = 660      # [nm]
+wave_start = 550    # [nm]
+wave_end = 750     # [nm]
 
-# choose if the imgages are all in one tiff stack or in seperate files (seperate files was how we used to have it, tiff stack is new but will make data transfer faster)
+# choose if the images are all in one tiff stack or in separate files (separate files was how we used to have it, tiff stack is new but will make data transfer faster)
 
 tiff_stack = True
 
@@ -39,8 +39,8 @@ binning = 1
 
 # chose elastomer thickness range , the smaller the range the faster the program. If you are not sure, just take d_min = 1000, d_max = 19000
 
-d_min= 4000 # [nm]
-d_max= 11000 # [nm]
+d_min= 6000 # [nm]
+d_max= 10000 # [nm]
 
 ####################
 # Advanced options #
@@ -48,10 +48,10 @@ d_max= 11000 # [nm]
 
 # one minimum fit option --> only the last fitted minimum in the wavelength range will be considered and fitted
 
-one_minimum_fit = True
+one_minimum_fit = False
 # guess the thickness at a certain position
 
-init_guess = 8350#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
+init_guess = 7500#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
 
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -69,8 +69,12 @@ lookahead_min = 5
 # 5 is a good value, 10 does not improve the result that much
 enhance_resolution = 5
 
+# average window, parameter which defines the window length for the smoothing: window_len = enhanced_resolution*average_window --> 1 equals 1 nm window
+
+average_window = 5
+
  # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see artifacts try to use "False"
-use_thickness_limits = True
+use_thickness_limits = False
 
 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit) --> this has to be smaller than 230nm/2, better 230nm/4
 thickness_limit = 50 
@@ -83,7 +87,11 @@ area_avrg = 2
 ### END of INPUT SECTION ###
 ############################
 
+#########################################
+# Developer parameters, DONT CHANGE!!!! #
+#########################################
 
+plot_error = True # standard is False
 
 #############################
 #### start of the program ###
@@ -92,7 +100,6 @@ area_avrg = 2
 # load all the python modules needed, they should all be part of the anaconda python distribution
 # import self-written cython code
 import cython_all_fit as Fit
-import cython_all_fit_one_minimum as Fit_one  
 import numpy as np
 import time
 import os 
@@ -101,8 +108,15 @@ import matplotlib.pyplot as plt
 from skimage.io import imread
 from skimage import transform
 
+ # only import other modules if needed
+if one_minimum_fit == True:
+    import cython_all_fit_one_minimum as Fit_one
+
+if plot_error == True:
+    import cython_all_fit_error_map  as Fit_error
+
 # change version of the release here which will be included in the results files
-version = 'BioCalc 2.2.0'
+version = 'BioCalc 2.2.1'
 
 t_a_start = time.time() # start timer for runtime measurement
 
@@ -340,13 +354,18 @@ for data_folder in data:
         t1 = time.time()
 
         if one_minimum_fit == True:
+            print "Using one minimum algorithm" 
             
             # call the external one minimum cython/c++ function with all the parameters
-            result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution)
+            result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution,average_window)
+        elif plot_error == True:
+            print "An error map will be plotted"
+            error_map_path = data_folder + '/' + folder 
+            result = Fit_error.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution,average_window,error_map_path)
         else:
-
+            print "Standard calculation"
             # call the external cython/c++ function with all the parameters
-            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution)[0]
+            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution,average_window)#[0]
        
         t2 = time.time()
 
@@ -372,7 +391,7 @@ for data_folder in data:
         print 'write data to file'
         
         # generate a header with all parameters
-        HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' +  'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
+        HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'binning = ' + str(binning) + '\n' +  'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'enhance_resolution = ' + str(enhance_resolution) + '\n' +'average_window = '+ str(average_window) + '\n' + 'one_minimum_fit = ' + str(one_minimum_fit) + '\n' +'init_guess = ' + str(init_guess) + '\n' +'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' + 'area_avrg = ' +str(area_avrg) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
 
         HEADER+= '\n'
 
@@ -386,7 +405,7 @@ for data_folder in data:
         result[result==0] = np.nan
         # use numpy function to save array to file
         # The Header is currently not written into the file, just uncomment the last part and remove one of the brackets
-        np.savetxt(data_folder + '/' + file_name,result,fmt='%0.0f',header=HEADER )
+        np.savetxt(data_folder + '/' + file_name,result,fmt='%0.0f')#,header=HEADER )
 
 
         print (time.time()-t_a_start), ' seconds for the whole program'
@@ -399,17 +418,26 @@ for data_folder in data:
         # parameters for printing
         # color map is calculated like (mean_thickness - color_min, mean_thickness + color_max) 
 
-        color_min = 500
-        color_max = 500
-        # make a new figure
-        plt.figure(folder)
-        # create plot of the results
-        plt.imshow(result)
-        # set the color scale to the limits provided
-        plt.clim(np.nanmean(result)-color_min,np.nanmean(result)+color_max)
-        # plot a color bar
-        plt.colorbar()
+        # color_min = 500
+        # color_max = 500
+        # # make a new figure
+        # plt.figure(folder)
+        # # create plot of the results
+        # plt.imshow(result)
+        # # set the color scale to the limits provided
+        # plt.clim(np.nanmean(result)-color_min,np.nanmean(result)+color_max)
+        # # plot a color bar
+        # plt.colorbar()
 
         # remove "#" to show the plot after the calculation
         #plt.show()
+
+
+    # write parameter file instead of header
+
+    parameter_file = data_folder +'/' + "Calculation_Parameters_" + data_folder + ".txt"
+    p = open(parameter_file,'w')
+
+    p.write(HEADER)
+    p.close()
 

@@ -7,6 +7,7 @@ import numpy as np
 cimport numpy as np
 cimport cython
 import matplotlib.pyplot as plt
+import time as time
 
 
 
@@ -267,7 +268,7 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 
     #perform some checks
     #if lookahead < 1:
-    #    raise ValueError, "Lookahead must enhance_resolution '1' or above in value"
+    #    raise ValueError, "Lookahead must enhance_resolutione '1' or above in value"
     #if not (np.isscalar(delta) and delta >= 0):
     #    raise ValueError, "delta must be a positive number"
 
@@ -411,7 +412,7 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 
 
 # the following parameters are passed to the function:
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] all_images, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_all_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short enhance_resolution, unsigned short average_window):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] all_images, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_all_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short enhance_resolution, unsigned short average_window, error_map_path):
 
     ########################################
     # definition of all the variable types #
@@ -420,6 +421,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
     cdef unsigned int Image_width = len(all_images[0][0])
     cdef np.ndarray[DTYPE_t, ndim=2] result = np.zeros((ende-start,Image_width),np.uint16 )
+    cdef np.ndarray[double, ndim = 2] error_map = np.zeros((ende-start,Image_width), dtype=np.float)
     cdef unsigned short column, row, column_c, row_c
     cdef np.ndarray[DTYPE_t, ndim=1] intensity
     cdef np.ndarray[DTYPE_t2,ndim=1] minima_exp
@@ -537,6 +539,11 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     # if a thickness was fitted, save it
                     if current_thickness != 0:
                         result[row][column]=current_thickness
+                        try:
+                            len(sim_min_waves)
+                            error_map[row][column] = min(sim_min_waves[1])
+                        except TypeError:
+                            pass  
                     
                     # if no thickness could be fitted, vary delta (fitting parameter in the minima algorithm) and try again
                     if current_thickness == 0: 
@@ -547,6 +554,11 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                             
                             if current_thickness != 0:
                                 result[row][column] = current_thickness
+                                try:
+                                    len(sim_min_waves)
+                                    error_map[row][column] = min(sim_min_waves[1])
+                                except TypeError:
+                                    pass
                                 break
                             # test with "-" new_delta*delta_vary
                             minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhance_resolution,lookahead_max*enhance_resolution, delta - new_delta*delta_vary,enhance_resolution,average_window),dtype=np.float)
@@ -554,6 +566,11 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 
                             if current_thickness != 0:
                                 result[row][column] = current_thickness
+                                try:
+                                    len(sim_min_waves)
+                                    error_map[row][column] = min(sim_min_waves[1])
+                                except TypeError:
+                                    pass
                                 break
 
 
@@ -562,6 +579,11 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 if current_thickness == 0:
                     current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index,thickness_list))
                     result[row][column] = current_thickness
+                    try:
+                        len(sim_min_waves)
+                        error_map[row][column] = min(sim_min_waves[1])
+                    except TypeError:
+                        pass
 
                 # if no thickness could be fitted, vary delta and try again (still without limits)
                 if current_thickness == 0: 
@@ -571,12 +593,22 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         
                         if current_thickness != 0:
                             result[row][column] = current_thickness
+                            try:
+                                len(sim_min_waves)
+                                error_map[row][column] = min(sim_min_waves[1])
+                            except TypeError:
+                                pass
                             break
                         minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhance_resolution,lookahead_max*enhance_resolution, delta - new_delta*delta_vary,enhance_resolution,average_window),dtype=np.float)
                         current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index,thickness_list))
                         
                         if current_thickness != 0:
                             result[row][column] = current_thickness
+                            try:
+                                len(sim_min_waves)
+                                error_map[row][column] = min(sim_min_waves[1])
+                            except TypeError:
+                                pass
                             break
 
     ################################################
@@ -594,7 +626,12 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 intensity = all_images[:,row, column]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhance_resolution,lookahead_max*enhance_resolution, delta,enhance_resolution,average_window),dtype=np.float)
                 current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,current_index,thickness_list))
-                result[row][column] = current_thickness   
+                result[row][column] = current_thickness
+                try:
+                    len(sim_min_waves)
+                    error_map[row][column] = min(sim_min_waves[1])
+                except TypeError:
+                    pass   
 
                 # if no thickness was fitted, try again with other delta
                 if current_thickness == 0: 
@@ -604,13 +641,26 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         
                         if current_thickness != 0:
                             result[row][column] = current_thickness
+                            try:
+                                len(sim_min_waves)
+                                error_map[row][column] = min(sim_min_waves[1])
+                            except TypeError:
+                                pass
                             break
                         minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhance_resolution,lookahead_max*enhance_resolution, delta - new_delta*delta_vary,enhance_resolution,average_window),dtype=np.float)
                         current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,current_index,thickness_list))
                         
                         if current_thickness != 0:
                             result[row][column] = current_thickness
+                            try:
+                                len(sim_min_waves)
+                                error_map[row][column] = min(sim_min_waves[1])
+                            except TypeError:
+                                pass
                             break
 
+    # write error map to file
+    file_name = error_map_path + "_error_map" + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
+    np.savetxt(file_name,error_map,fmt='%0.5f')
     # feed the fitted thicknesses back to the main program, with sim_min_waves one can access the error, this can be done better --> in progress
     return result#, sim_min_waves

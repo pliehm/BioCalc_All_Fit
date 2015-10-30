@@ -661,6 +661,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
     # write error map to file
     file_name = error_map_path + "_error_map" + time.strftime("_%Y%m%d_%H%M%S")+'.txt'
+    error_map[error_map==0]= np.nan
     np.savetxt(file_name,error_map,fmt='%0.5f')
     # feed the fitted thicknesses back to the main program, with sim_min_waves one can access the error, this can be done better --> in progress
     return result#, sim_min_waves

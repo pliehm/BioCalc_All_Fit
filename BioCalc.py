@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['different_slits_small']
+data = ['data']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure

@@ -134,21 +134,21 @@ cdef Fit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1] arra
                     sim_min_waves[1].append(summe/float(L_exp_waves))
                     continue
 
-            if array_length_block[i] == (L_exp_waves + 2):
-                breaker = 0
-                summe=0
-                #sim_waves_part_part = sim_waves_part[2]
+            # if array_length_block[i] == (L_exp_waves + 2):
+            #     breaker = 0
+            #     summe=0
+            #     #sim_waves_part_part = sim_waves_part[2]
 
-                for k in xrange(array_length_block[i]-2):
-                    summe+= abs(all_minima[position+k+1]-exp_waves[k+1])
-                    if summe/(L_exp_waves-1) > tolerance:
-                        breaker = 0
-                        break
-                if breaker == 1:
-                    continue
-                sim_min_waves[0].append(thickness[i])
-                sim_min_waves[1].append(summe/float(L_exp_waves))
-                continue
+            #     for k in xrange(array_length_block[i]-2):
+            #         summe+= abs(all_minima[position+k+1]-exp_waves[k+1])
+            #         if summe/(L_exp_waves-1) > tolerance:
+            #             breaker = 0
+            #             break
+            #     if breaker == 1:
+            #         continue
+            #     sim_min_waves[0].append(thickness[i])
+            #     sim_min_waves[1].append(summe/float(L_exp_waves))
+            #     continue
 
 # return the thickness with minimum value
         if  len(sim_min_waves[0])>1 and (min(sim_min_waves[1]) < tolerance):
@@ -256,21 +256,21 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
                     sim_min_waves[1].append(summe/float(L_exp_waves))
                     continue
 
-            if array_length_block[i] == (L_exp_waves + 2):
-                breaker = 0
-                summe=0
-                #sim_waves_part_part = sim_waves_part[2]
+            # if array_length_block[i] == (L_exp_waves + 2):
+            #     breaker = 0
+            #     summe=0
+            #     #sim_waves_part_part = sim_waves_part[2]
 
-                for k in xrange(array_length_block[i]-2):
-                    summe+= abs(all_minima[position+k+1]-exp_waves[k+1])
-                    if summe/(L_exp_waves-1) > tolerance:
-                        breaker = 0
-                        break
-                if breaker == 1:
-                    continue
-                sim_min_waves[0].append(thickness[i])
-                sim_min_waves[1].append(summe/float(L_exp_waves))
-                continue
+            #     for k in xrange(array_length_block[i]-2):
+            #         summe+= abs(all_minima[position+k+1]-exp_waves[k+1])
+            #         if summe/(L_exp_waves-1) > tolerance:
+            #             breaker = 0
+            #             break
+            #     if breaker == 1:
+            #         continue
+            #     sim_min_waves[0].append(thickness[i])
+            #     sim_min_waves[1].append(summe/float(L_exp_waves))
+            #     continue
                 
 # return the thickness with minimum value
         if  len(sim_min_waves[0])>1 and (min(sim_min_waves[1]) < tolerance):

@@ -84,12 +84,12 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
             # print i
             # print sim_min_waves[0]
 
-            return sim_min_waves[0][sim_min_waves[1].index(min(sim_min_waves[1]))], thickness_list.index(sim_min_waves[0][sim_min_waves[1].index(min(sim_min_waves[1]))]), sim_min_waves
+            return sim_min_waves[0][sim_min_waves[1].index(min(sim_min_waves[1]))]#, thickness_list.index(sim_min_waves[0][sim_min_waves[1].index(min(sim_min_waves[1]))]), sim_min_waves
         else: 
-            return 0, 0,0
+            return 0
 
     else:
-        return 0, 0,0
+        return 0
 
 
 
@@ -270,7 +270,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
     cdef np.ndarray[double,ndim=1] sim_minima_blocks
     cdef np.ndarray[DTYPE_t,ndim=1] array_length_block, thickness
     cdef np.ndarray[DTYPE_t3,ndim=1] array_thickness_len_pos
-    cdef unsigned int current_thickness = 0, current_index = 0, last_index = 0, limit_counter = 0 # choose b = 10 to use interp + smoothing of data
+    cdef unsigned int current_thickness = 0, last_index = 0, limit_counter = 0 # choose b = 10 to use interp + smoothing of data
     cdef float last_thickness = 0
     cdef list a = [] # dummy list
     cdef list thickness_list = []
@@ -325,7 +325,6 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
                 last_index = 0
                 current_thickness = 0
-                current_index = 0
                 limit_counter = 0
 
                 # write loop to consider the area around the current pixel
@@ -398,7 +397,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 #print column, last_thickness
                 # if the thickness in the area is in the thickness list, search for the index of that thickness and store it
                 if last_thickness > (thickness_list[0] + 2*thickness_limit):
-                    last_index = thickness_list.index(int(last_thickness))
+                    last_index = last_thickness - thickness_list[0]# thickness_list.index(int(last_thickness))
 
                 # print current_thickness, last_thickness, last_index
                 # last_index = thickness_list.index(int(last_thickness))
@@ -420,7 +419,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 # only do the calculation if a minimum was found
                 if len(minima_exp) != 0: 
 
-                    current_thickness, current_index, sim_min_waves = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,sim_minima_blocks,last_index,thickness_list, thickness_limit))
+                    current_thickness = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,sim_minima_blocks,last_index,thickness_list, thickness_limit))
                         #if current_thickness != 0:
                     thickness_ready[row][column] = current_thickness
                 else:

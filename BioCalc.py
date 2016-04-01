@@ -51,7 +51,7 @@ d_max= 10000 # [nm]
 one_minimum_fit = False
 # guess the thickness at a certain position
 
-init_guess = 7500#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
+init_guess = 7520#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
 
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -74,7 +74,7 @@ enhance_resolution = 5
 average_window = 5
 
  # Enter "True" if you want to do calculation with thickness limits and "False" if not. I recommend starting with "True" if you see artifacts try to use "False"
-use_thickness_limits = False
+use_thickness_limits = True
 
 # [nm] enter the thickness limit (if thickness was found, next on will be: last_thickness +- thickness_limit) --> this has to be smaller than 230nm/2, better 230nm/4
 thickness_limit = 50 
@@ -91,7 +91,7 @@ area_avrg = 2
 # Developer parameters, DONT CHANGE!!!! #
 #########################################
 
-plot_error = True # standard is False
+plot_error = False # standard is False
 
 #############################
 #### start of the program ###
@@ -299,7 +299,9 @@ for data_folder in data:
                 # clear the waveblock to write new wavelengths into it
                 minima_block=[]
 
-
+        #print thickness_len_pos[200]
+        #print list_all_minima_blocks[10]
+        #quit()
 
 ###############################################################################
 ## Find new delta (minima finding algorithm) to deal with different dynamics ##
@@ -355,9 +357,13 @@ for data_folder in data:
 
         if one_minimum_fit == True:
             print "Using one minimum algorithm" 
+            if use_thickness_limits == True:
             
-            # call the external one minimum cython/c++ function with all the parameters
-            result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution,average_window)
+                # call the external one minimum cython/c++ function with all the parameters
+                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution,average_window)
+            else:
+                print "\nERROR: You have to set: use_thickness_limits == True\n"
+                quit()
         elif plot_error == True:
             print "An error map will be plotted"
             error_map_path = data_folder + '/' + folder 

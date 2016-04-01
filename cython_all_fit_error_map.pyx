@@ -555,7 +555,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
                 # if the thickness in the area is in the thickness list, search for the index of that thickness and store it --> this will be used to guess the thickness
                 if last_thickness > (thickness_list[0] + 2*thickness_limit):
-                    last_index = thickness_list.index(int(last_thickness))
+                    last_index =  last_thickness - thickness_list[0]# thickness_list.index(int(last_thickness))
 
                 # get array with the intensity profile for the current pixel
                 intensity = all_images[:,row, column]

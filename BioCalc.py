@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['data']
+data = ['test_1_min']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
@@ -21,8 +21,8 @@ data = ['data']
 sim_file = '2015_10_26_standard.txt'
 
 # chose wavelength range for calculation
-wave_start = 550    # [nm]
-wave_end = 750     # [nm]
+wave_start = 650    # [nm]
+wave_end = 690     # [nm]
 
 # choose if the images are all in one tiff stack or in separate files (separate files was how we used to have it, tiff stack is new but will make data transfer faster)
 
@@ -30,8 +30,8 @@ tiff_stack = True
 
 # enter wavelength range of stack (only needed if tiff_stack = True)
 
-stack_wave_start = 550 # [nm]
-stack_wave_end = 750 # [nm]
+stack_wave_start = 650 # [nm]
+stack_wave_end = 690 # [nm]
 
 # enter a value to apply binning to run the calculation faster
 binning = 1
@@ -48,7 +48,7 @@ d_max= 10000 # [nm]
 
 # one minimum fit option --> only the last fitted minimum in the wavelength range will be considered and fitted
 
-one_minimum_fit = False
+one_minimum_fit = True
 # guess the thickness at a certain position
 
 init_guess = 7520#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
@@ -67,7 +67,7 @@ lookahead_min = 5
 
 # set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
 # 5 is a good value, 10 does not improve the result that much
-enhance_resolution = 5
+enhance_resolution = 10
 
 # average window, parameter which defines the window length for the smoothing: window_len = enhanced_resolution*average_window --> 1 equals 1 nm window
 
@@ -82,6 +82,15 @@ thickness_limit = 50
 # this number defines how many pixel are considerd for an average to guess the new thickness, e.g.: 2 means that all pixels in a range of 2 rows above, two columns to the left and the right are averaged, that makes 12px, 1 --> 4px, 2 --> 12px, 3--> 24px
 area_avrg = 2 
 
+
+
+# check what your experimental data for each stack is, multiply by the enhance_resolution factor, multiply with number of 
+# simulations you are planning to run in parallel, multiply with 2. For example: data = 550MB, enhanced_resolution = 5 
+# --> 550*5 = 2750*2 = 5500MB. This is how much memory one calculation occupies, if you want to run 4 in parallel: 
+# 5500*4 = 22000 MB = 22 GB You would need 22 GB of RAM for this!!
+# If this is more (or close to) the amount of RAM you have, chose "save_ram = True". This will be a bit slower but more memory efficient.
+
+save_ram = False
 
 ############################
 ### END of INPUT SECTION ###
@@ -101,6 +110,7 @@ plot_error = False # standard is False
 # import self-written cython code
 import cython_all_fit as Fit
 import numpy as np
+import scipy as sp
 import time
 import os 
 from PIL import Image as im
@@ -122,6 +132,50 @@ t_a_start = time.time() # start timer for runtime measurement
 
 
 
+
+# define function for interpolation
+
+def self_interpolate(raw,enhance_resolution):
+
+    Image_width = raw.shape[2]
+    Image_height = raw.shape[1]
+    Image_depth = raw.shape[0]
+
+    arr_interp = np.zeros(((Image_depth-1)*enhance_resolution+1,Image_height,Image_width),np.uint16)
+
+
+    interp_counter = 0
+    stack_counter = 0
+    raw = raw.astype(np.float32)
+    t1= time.time()
+    for i in range(len(arr_interp)):
+        if interp_counter == 0 and stack_counter==0:
+            #print "c"
+            arr_interp[i] = raw[stack_counter]
+            temp_arr = (raw[stack_counter+1]-raw[stack_counter])/enhance_resolution
+            interp_counter+=1
+            continue
+        if interp_counter != enhance_resolution:
+            #print "b"
+            arr_interp[i] = raw[stack_counter]+interp_counter*temp_arr
+            interp_counter += 1
+            continue
+
+        if interp_counter == enhance_resolution:
+            stack_counter += 1
+            if stack_counter != Image_depth-1:
+                arr_interp[i] = raw[stack_counter]
+                temp_arr = (raw[stack_counter+1]-raw[stack_counter])/enhance_resolution
+            
+                interp_counter = 1
+                continue
+            else:
+                arr_interp[i] = raw[stack_counter]
+                continue
+
+    return arr_interp
+
+
 # for every folder with images in the data folder do:
 for data_folder in data:
 
@@ -140,7 +194,7 @@ for data_folder in data:
         # make wavelength list
 
         # [nm], this can be adjusted if you don't have an image every nanometer
-        wave_step = 1      
+        wave_step = 1.0/enhance_resolution      
         
         # create an empty list which will later contain all wavelengths, e.g. 550,551,552,...,750
         waves=[]
@@ -227,16 +281,43 @@ for data_folder in data:
             stack = imread(data_folder + '/'+folder + '/' + stack_name)
 
             # calculate dimensions of the images, this will be needed later on
-            Image_width = len(stack[0][0])/binning
-            Image_height = len(stack[0])/binning
+            Image_width = int(np.round(len(stack[0][0])/float(binning)))
+            Image_height = int(np.round(len(stack[0])/float(binning)))
 
             # create an empty array which will contain all image data 
-            all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
+            #all_images = np.zeros(((wave_end-wave_start)/wave_step + 1,Image_height,Image_width),np.uint16)
 
             # write image stack to numpy array
-            for i in range(len(all_images)):
-                all_images[i]=transform.rescale(stack[i+(wave_start-stack_wave_start)],1.0/binning,preserve_range=True).round().astype(np.uint16)
+            if binning != 1:
+                binned_stack = np.zeros(((wave_end-wave_start)/(wave_step*enhance_resolution) + 1,Image_height,Image_width),np.uint16)
+                for i in range(len(stack)):
+                    binned_stack[i]=transform.rescale(stack[i+(wave_start-stack_wave_start)],1.0/binning,preserve_range=True).round().astype(np.uint16)
 
+                stack = binned_stack
+                #all_images = sp.ndimage.uniform_filter(sp.ndimage.interpolation.zoom(all_images, [((len(all_images)-1.0)*enhance_resolution+1)/len(all_images),1,1], order = 1),(enhance_resolution**2,0,0))
+        
+            if enhance_resolution != 1:
+                test_time_1 = time.time()
+                all_images = self_interpolate(stack,enhance_resolution)
+                #all_images = sp.ndimage.interpolation.zoom(all_images, [((wave_end-wave_start)/wave_step+1)/(wave_end-wave_start+1),1,1], order = 1)
+                #all_images = transform.resize(all_images,(len(all_images)*enhance_resolution-enhance_resolution + 1,Image_height,Image_width),order=1, preserve_range=True).round().astype(np.uint16)
+                test_time_2 = time.time()
+                print "interpolation takes: ", test_time_2-test_time_1
+                 #sys.exit("interpolation")
+                #all_images = sp.ndimage.uniform_filter(all_images,(enhance_resolution**2,0,0))
+                #all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
+                if save_ram == True:
+                    for y in xrange(len(all_images[0])):
+                        print y
+                        for x in xrange(len(all_images[0][0])):
+                            all_images[:,y,x] = sp.ndimage.uniform_filter1d(all_images[:,y,x],size=enhance_resolution**2)
+                else:
+                    all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
+            else:
+                all_images = stack
+                print "smoothing takes: ", time.time()-test_time_2
+            #sys.exit("smoothing")
+            #quit()
             # bit depth
             Image_bit = '16'
 
@@ -360,18 +441,18 @@ for data_folder in data:
             if use_thickness_limits == True:
             
                 # call the external one minimum cython/c++ function with all the parameters
-                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,enhance_resolution,average_window)
+                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,average_window)
             else:
                 print "\nERROR: You have to set: use_thickness_limits == True\n"
                 quit()
         elif plot_error == True:
             print "An error map will be plotted"
             error_map_path = data_folder + '/' + folder 
-            result = Fit_error.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution,average_window,error_map_path)
+            result = Fit_error.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,average_window,error_map_path)
         else:
             print "Standard calculation"
             # call the external cython/c++ function with all the parameters
-            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min, lookahead_max, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,enhance_resolution,average_window)#[0]
+            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,average_window)#[0]
        
         t2 = time.time()
 

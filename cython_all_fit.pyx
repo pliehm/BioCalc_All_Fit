@@ -282,7 +282,7 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
 # function to get minima of the intensity profile array #
 #########################################################
 
-cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0, unsigned short average_window=5):    
+cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0):    
     # define output container
     #cdef list max_peaks=[]
     cdef list min_peaks = []
@@ -389,7 +389,7 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
 
 
 # the following parameters are passed to the function:
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] all_images, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_all_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short average_window):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] all_images, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_all_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg):
 
     ########################################
     # definition of all the variable types #
@@ -503,7 +503,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 # get array with the intensity profile for the current pixel
                 intensity = all_images[:,row, column]
                 # find the minima in the profile
-                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta,average_window),dtype=np.float)
+                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)
 
                 # start calculations with limits
 
@@ -519,14 +519,14 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     if current_thickness == 0: 
                         for new_delta in range(1,5):
                             # test with "+" new_delta*delta_vary
-                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary,average_window),dtype=np.float)
+                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                             current_thickness = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, last_index, thickness_list,thickness_limit))
                             
                             if current_thickness != 0:
                                 result[row,column] = current_thickness
                                 break
                             # test with "-" new_delta*delta_vary
-                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary,average_window),dtype=np.float)
+                            minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary),dtype=np.float)
                             current_thickness = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, last_index,thickness_list,thickness_limit))
                 
                             if current_thickness != 0:
@@ -543,13 +543,13 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 # if no thickness could be fitted, vary delta and try again (still without limits)
                 if current_thickness == 0: 
                     for new_delta in range(1,5):
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary,average_window),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                         current_thickness = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, thickness_list))
                         
                         if current_thickness != 0:
                             result[row,column] = current_thickness
                             break
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary,average_window),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary),dtype=np.float)
                         current_thickness = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, thickness_list))
                         
                         if current_thickness != 0:
@@ -569,20 +569,20 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
             counter+=1
             for column in xrange(Image_width):
                 intensity = all_images[:,row, column]
-                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta,average_window),dtype=np.float)
+                minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta),dtype=np.float)
                 current_thickness = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,thickness_list))
                 result[row,column] = current_thickness   
 
                 # if no thickness was fitted, try again with other delta
                 if current_thickness == 0: 
                     for new_delta in range(1,5):
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary,average_window),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta + new_delta*delta_vary),dtype=np.float)
                         current_thickness = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, thickness_list))
                         
                         if current_thickness != 0:
                             result[row,column] = current_thickness
                             break
-                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary,average_window),dtype=np.float)
+                        minima_exp = np.array(peakdetect(intensity, waves, lookahead_min,lookahead_max, delta - new_delta*delta_vary),dtype=np.float)
                         current_thickness= (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,thickness_list))
                         if current_thickness != 0:
                             result[row,column] = current_thickness

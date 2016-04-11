@@ -112,7 +112,7 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
 # function to get minima of the intensity profile array #
 #########################################################
 
-cdef tuple peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0,unsigned short average_window=5, double minima_guess=0, unsigned int index_guess = 0):
+cdef tuple peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, unsigned short lookahead_min=5, unsigned short lookahead_max=3, unsigned short delta = 0, double minima_guess=0, unsigned int index_guess = 0):
     
     # define output container
     #cdef list max_peaks=[]
@@ -277,7 +277,7 @@ cdef tuple peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, un
 
 # the following parameters are passed to the function:
 # start wavelength, end wavelength, all images, list of thickness/blocklength/position,list of waves, tolerance, lookahead_min, lookahead_max, delta, delta variations, minima blocks, thickness limits in use?, thickness limit, 
-def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short init_guess, unsigned short average_window):
+def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3] data, list thickness_len_pos, list waves, float tolerance, unsigned short lookahead_min,unsigned short lookahead_max, unsigned short delta, unsigned short delta_vary, list list_minima_blocks, use_thickness_limits, unsigned int thickness_limit, unsigned short area_avrg, unsigned short init_guess):
 
     ########################################
     # definition of all the variable types #
@@ -423,10 +423,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
 
                 # find the minima in the profile
                 if column>0:
-                    minima_exp, min_index = peakdetect(data[:,row,column], waves, lookahead_min,lookahead_max, delta,average_window, minima_ready[row,column-1], min_index)
-                    #minima_exp, min_index = peakdetect(intensity, waves, lookahead_min,lookahead_max, delta,average_window)
+                    minima_exp, min_index = peakdetect(data[:,row,column], waves, lookahead_min,lookahead_max, delta,minima_ready[row,column-1], min_index)
+                    #minima_exp, min_index = peakdetect(intensity, waves, lookahead_min,lookahead_max, delta)
                 else:
-                    minima_exp, min_index = peakdetect(data[:,row,column], waves, lookahead_min,lookahead_max, delta,average_window)
+                    minima_exp, min_index = peakdetect(data[:,row,column], waves, lookahead_min,lookahead_max, delta)
                     
                 # only do the calculation if a minimum was found
                 if minima_exp != 0: 

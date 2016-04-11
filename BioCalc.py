@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['4_x=-51653.48, y=-36444.88','5_x=-51000.88, y=-36670.04','6_x=-51003.68, y=-37773.84','7_x=-51323.28, y=-38478.40','8_x=-50770.80, y=-38423.52','9_x=-50787.16, y=-39381.20']
+data = ['data']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
@@ -30,8 +30,8 @@ tiff_stack = True
 
 # enter wavelength range of stack (only needed if tiff_stack = True)
 
-stack_wave_start = 650 # [nm]
-stack_wave_end = 690 # [nm]
+stack_wave_start = 550 # [nm]
+stack_wave_end = 750 # [nm]
 
 # enter a value to apply binning to run the calculation faster
 binning = 1
@@ -52,7 +52,7 @@ one_minimum_fit = True
 
 # guess the thickness at a certain position. THIS HAS TO BE A LIST!!! e.g. [7500] or [7500,7800,7400]
 # the values have to correspond to the folders
-init_guess = [7653,7670,7632,7572,7605,7624] 
+init_guess = [7667] 
 
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -127,7 +127,7 @@ if plot_error == True:
     import cython_all_fit_error_map  as Fit_error
 
 # change version of the release here which will be included in the results files
-version = 'BioCalc 2.2.2'
+version = 'BioCalc 2.3'
 
 t_a_start = time.time() # start timer for runtime measurement
 
@@ -385,9 +385,9 @@ for data_folder in data:
                     for y in xrange(len(all_images[0])):
                         #print y
                         for x in xrange(len(all_images[0][0])):
-                            all_images[:,y,x] = sp.ndimage.uniform_filter1d(all_images[:,y,x],size=enhance_resolution**2)
+                            all_images[:,y,x] = sp.ndimage.uniform_filter1d(all_images[:,y,x],size=average_window*enhance_resolution)
                 else:
-                    all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
+                    all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=average_window*enhance_resolution)
                 print "smoothing takes: ", time.time()-test_time_2
                 
             # case for no resolution enhancement
@@ -461,18 +461,18 @@ for data_folder in data:
             if use_thickness_limits == True:
             
                 # call the external one minimum cython/c++ function with all the parameters
-                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess[folder_counter],average_window)
+                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess[folder_counter])
             else:
                 print "\nERROR: You have to set: use_thickness_limits == True\n"
                 quit()
         elif plot_error == True:
             print "An error map will be plotted"
             error_map_path = data_folder + '/' + folder 
-            result = Fit_error.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,average_window,error_map_path)
+            result = Fit_error.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,error_map_path)
         else:
             print "Standard calculation"
             # call the external cython/c++ function with all the parameters
-            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,average_window)#[0]
+            result = Fit.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg)#[0]
        
         t2 = time.time()
 

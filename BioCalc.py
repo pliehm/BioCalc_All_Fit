@@ -126,7 +126,7 @@ if plot_error == True:
     import cython_all_fit_error_map  as Fit_error
 
 # change version of the release here which will be included in the results files
-version = 'BioCalc 2.2.1'
+version = 'BioCalc 2.2.2'
 
 t_a_start = time.time() # start timer for runtime measurement
 

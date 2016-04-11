@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['test_1_min']
+data = ['data']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
@@ -30,8 +30,8 @@ tiff_stack = True
 
 # enter wavelength range of stack (only needed if tiff_stack = True)
 
-stack_wave_start = 650 # [nm]
-stack_wave_end = 690 # [nm]
+stack_wave_start = 550 # [nm]
+stack_wave_end = 750 # [nm]
 
 # enter a value to apply binning to run the calculation faster
 binning = 1
@@ -51,7 +51,7 @@ d_max= 10000 # [nm]
 one_minimum_fit = True
 # guess the thickness at a certain position
 
-init_guess = 7520#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
+init_guess = 7669#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
 
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -175,6 +175,68 @@ def self_interpolate(raw,enhance_resolution):
 
     return arr_interp
 
+#######################################################################
+# Read the simulation file and get the minima for the thickness range #
+#######################################################################
+
+
+# read simulation file 
+print 'read simulated data'
+
+# open file
+p= open('Simulated_minima/' + sim_file,'r')
+
+# read the whole content of the file into a string
+string=p.read()
+
+# close the file
+p.close()
+
+# list which will contain, thickness, length of a set of wavelengths, starting position of the block --> this is all useful to have to improve speed
+thickness_len_pos=[]
+
+# current set of minima for one thickness (temporary list)
+minima_block=[]
+
+# list which contains all minima_blocks arrays one after another --> in combination with the list thickness_len_pos one has all the data needed
+list_all_minima_blocks = []
+
+# variable which defines at which position a set of minima starts
+position = 0
+
+# Start reading the file
+
+# read every line of the string
+for thisline in string.split('\n'):
+    # check if the current line contains a thickness
+    if ('\t' in thisline) == False and len(thisline) != 0:
+        thickness = thisline
+    # check if this is a line with no thickness, but one is still in the thickness range
+    if ('\t' in thisline) == True and int(thickness) >= d_min and int(thickness) <= d_max:
+        # split line into words
+        for word in thisline.split('\t'):
+            # check word if it is a wavelength, only append it if its in the wavelength range +- lookahead, len(word)<7 assures that word is a wavelength and not the reflectivity value
+            if len(word)<7 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: 
+                # append the wavelength to the current block of wavelengths
+                minima_block.append(float(word))
+
+    # check if the line is empty and inside the thickness range
+    if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
+
+        # append thickness, length of waveblock, position of block to a list, convert to 16 or 32 bit, that is important to assure that the values are not corrupted because they are outside the right data range
+        thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
+
+        # append waveblock as an array (faster data handling later on)
+        list_all_minima_blocks.append(np.array(minima_block,dtype=np.float))
+
+        # update the current starting position of the next waveblock
+        position += len(minima_block)
+        # clear the waveblock to write new wavelengths into it
+        minima_block=[]
+
+#print thickness_len_pos[200]
+#print list_all_minima_blocks[10]
+#quit()
 
 # for every folder with images in the data folder do:
 for data_folder in data:
@@ -193,7 +255,7 @@ for data_folder in data:
 
         # make wavelength list
 
-        # [nm], this can be adjusted if you don't have an image every nanometer
+        # This should not be changed to another step size
         wave_step = 1.0/enhance_resolution      
         
         # create an empty list which will later contain all wavelengths, e.g. 550,551,552,...,750
@@ -247,26 +309,29 @@ for data_folder in data:
             print 'reading images from folder: ', folder
 
             # start iterating over the files
-            for i in xrange(len(files)):
-                # only consider files with the ending tiff, tif
-                if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
-                    # check if the current file is in the wavelength range the user specified at the beginning
-                    if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
-                        print files[i]
-                        #print counter
+            if enhance_resolution == 1: 
+                for i in xrange(len(files)):
+                    # only consider files with the ending tiff, tif
+                    if files[i][-5:]=='.tiff' or files[i][-4:]=='.tif':
+                        # check if the current file is in the wavelength range the user specified at the beginning
+                        if float(files[i][:-4]) >= wave_start and float(files[i][:-4]) <= wave_end:
+                            print files[i]
+                            #print counter
 
-                        # check if its 8-bit, convert, load
-                        if Image_bit == '8':
-                            Img = im.open(data_folder + '/'+folder + '/' + files[i])
-                            Img = Img.convert('L')
-                            all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
+                            # check if its 8-bit, convert, load
+                            if Image_bit == '8':
+                                Img = im.open(data_folder + '/'+folder + '/' + files[i])
+                                Img = Img.convert('L')
+                                all_images[counter]=transform.rescale(np.asarray(Img),1.0/binning,preserve_range=True).round().astype(np.uint16)
 
-                        # read all other formats with imread from skimage
-                        else:
-                            Img = data_folder + '/'+folder + '/' + files[i]
-                            all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
+                            # read all other formats with imread from skimage
+                            else:
+                                Img = data_folder + '/'+folder + '/' + files[i]
+                                all_images[counter]=transform.rescale(imread(Img, as_grey=True),1.0/binning,preserve_range=True).round().astype(np.uint16)
 
-                        counter+= 1
+                            counter+= 1
+            else:
+                sys.exit("Sorry, but you cannot use the enhanced resolution function without using a tiff stack. Please use Imagej to create a tiff stack from the single files.")
 
         if tiff_stack == True:
             print 'reading images from folder: ', folder
@@ -290,15 +355,20 @@ for data_folder in data:
             # write image stack to numpy array
             if binning != 1:
                 binned_stack = np.zeros(((wave_end-wave_start)/(wave_step*enhance_resolution) + 1,Image_height,Image_width),np.uint16)
-                for i in range(len(stack)):
+                for i in range(len(stack[wave_start-stack_wave_start:wave_end-stack_wave_start+1])):
                     binned_stack[i]=transform.rescale(stack[i+(wave_start-stack_wave_start)],1.0/binning,preserve_range=True).round().astype(np.uint16)
 
                 stack = binned_stack
                 #all_images = sp.ndimage.uniform_filter(sp.ndimage.interpolation.zoom(all_images, [((len(all_images)-1.0)*enhance_resolution+1)/len(all_images),1,1], order = 1),(enhance_resolution**2,0,0))
-        
+            
+
             if enhance_resolution != 1:
                 test_time_1 = time.time()
-                all_images = self_interpolate(stack,enhance_resolution)
+                
+                if binning != 1:
+                    all_images = self_interpolate(stack,enhance_resolution)
+                else:
+                    all_images = self_interpolate(stack[wave_start-stack_wave_start:wave_end-stack_wave_start+1],enhance_resolution)
                 #all_images = sp.ndimage.interpolation.zoom(all_images, [((wave_end-wave_start)/wave_step+1)/(wave_end-wave_start+1),1,1], order = 1)
                 #all_images = transform.resize(all_images,(len(all_images)*enhance_resolution-enhance_resolution + 1,Image_height,Image_width),order=1, preserve_range=True).round().astype(np.uint16)
                 test_time_2 = time.time()
@@ -308,81 +378,24 @@ for data_folder in data:
                 #all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
                 if save_ram == True:
                     for y in xrange(len(all_images[0])):
-                        print y
+                        #print y
                         for x in xrange(len(all_images[0][0])):
                             all_images[:,y,x] = sp.ndimage.uniform_filter1d(all_images[:,y,x],size=enhance_resolution**2)
                 else:
                     all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
-            else:
-                all_images = stack
                 print "smoothing takes: ", time.time()-test_time_2
+            else:
+                if binning != 1:
+                    all_images = stack
+                else: 
+                    all_images = stack[wave_start-stack_wave_start:wave_end-stack_wave_start+1]
+                    
             #sys.exit("smoothing")
             #quit()
             # bit depth
             Image_bit = '16'
 
-#######################################################################
-# Read the simulation file and get the minima for the thickness range #
-#######################################################################
 
-
-        # read simulation file 
-        print 'read simulated data'
-
-        # open file
-        p= open('Simulated_minima/' + sim_file,'r')
-
-        # read the whole content of the file into a string
-        string=p.read()
-
-        # close the file
-        p.close()
-
-        # list which will contain, thickness, length of a set of wavelengths, starting position of the block --> this is all useful to have to improve speed
-        thickness_len_pos=[]
-
-        # current set of minima for one thickness (temporary list)
-        minima_block=[]
-
-        # list which contains all minima_blocks arrays one after another --> in combination with the list thickness_len_pos one has all the data needed
-        list_all_minima_blocks = []
-
-        # variable which defines at which position a set of minima starts
-        position = 0
-
-        # Start reading the file
-
-        # read every line of the string
-        for thisline in string.split('\n'):
-            # check if the current line contains a thickness
-            if ('\t' in thisline) == False and len(thisline) != 0:
-                thickness = thisline
-            # check if this is a line with no thickness, but one is still in the thickness range
-            if ('\t' in thisline) == True and int(thickness) >= d_min and int(thickness) <= d_max:
-                # split line into words
-                for word in thisline.split('\t'):
-                    # check word if it is a wavelength, only append it if its in the wavelength range +- lookahead, len(word)<7 assures that word is a wavelength and not the reflectivity value
-                    if len(word)<7 and float(word) >= wave_start + lookahead_min and float(word)<= wave_end - lookahead_min: 
-                        # append the wavelength to the current block of wavelengths
-                        minima_block.append(float(word))
-
-            # check if the line is empty and inside the thickness range
-            if len(thisline) == 0 and int(thickness) >= d_min and int(thickness) <= d_max:
-
-                # append thickness, length of waveblock, position of block to a list, convert to 16 or 32 bit, that is important to assure that the values are not corrupted because they are outside the right data range
-                thickness_len_pos.append([np.uint16(thickness),np.uint16(len(minima_block)),np.uint32(position)]) # calculate length of the waveblock since it will be needed later
-
-                # append waveblock as an array (faster data handling later on)
-                list_all_minima_blocks.append(np.array(minima_block,dtype=np.float))
-
-                # update the current starting position of the next waveblock
-                position += len(minima_block)
-                # clear the waveblock to write new wavelengths into it
-                minima_block=[]
-
-        #print thickness_len_pos[200]
-        #print list_all_minima_blocks[10]
-        #quit()
 
 ###############################################################################
 ## Find new delta (minima finding algorithm) to deal with different dynamics ##

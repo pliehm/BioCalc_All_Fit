@@ -309,7 +309,7 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
     cdef float mn = 100000
     cdef float mx = -100000
     cdef unsigned short index, window_len 
-    cdef float x, y 
+    cdef float x, y, wave_max
     # why am I using np.double_t here? could it not be np.float?
     cdef np.ndarray[np.double_t, ndim=1] y_interp, x_interp,s, y_temp,w 
 
@@ -368,56 +368,49 @@ cdef list peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, uns
     # plt.clf()
     # plt.plot(x_axis,y_axis_list)
     # plt.ylim((1000,9000))
-    for index, (x,y) in enumerate(zip(x_axis[:-lookahead_min], y_axis_list[:-lookahead_min])):
-        #print index
-        
-        if y > mx:
-            mx = y
-            mxpos = x
+        for index in xrange(length):
+            y = y_axis_list[index]
+            x = x_axis[index]
+            # plt.vlines(x_axis[index],5000,9000,color='g') 
+            #print index
+            
+            if y > mx:
+                mx = y
+                mxpos = x
 
-        if y < mn:
-            mn = y
-            mnpos = x
+            if y < mn:
+                mn = y
+                mnpos = x
 
-        #### look for max ####
-        
-        if y < mx-delta and mx != 100000:
-            #Maxima peak candidate found
-            # lool ahead in signal to ensure that this is a peak and not jitter
-            if max(y_axis_list[index:index+lookahead_max]) < mx:
+
+            if y < mx-delta and mx != 100000:
+                #Maxima peak candidate found
                 #max_peaks.append([mxpos, mx])
                 dump.append(True)
                 #set algorithm to only find minima now
                 
                 mx = 100000
                 mn = 100000
-                if index+lookahead_min >= length:
-                    #end is within lookahead no more peaks can be found
-                    break
-                continue
+                continue    
 
-        #### look for min ####    
-        
-        if y > mn+delta and mn != -100000:
-            #Minima peak candidate found
-            # look ahead in signal to ensure that this is a peak and not jitter
-            if min(y_axis_list[index:index+lookahead_min]) > mn:
-                min_peaks.append(mnpos)
-                dump.append(False)
-                #set algorithm to only find maximum now
-                mn = -100000
-                mx = -100000
-                if index+lookahead_min >= length:
-                    #end is within lookahead no more peaks can be found
-                    break
+            #### look for min ####    
+            
+            if y > mn+delta and mn != -100000:
+                #Minima peak candidate found
+                # look ahead in signal to ensure that this is a peak and not jitter
+                if mnpos < wave_max:
+                    min_peaks.append([index,mnpos])
+                    dump.append(False)
+                    #set algorithm to only find maximum now
+                    mn = -100000
+                    mx = -100000
 
-
-    #Remove the false hit on the first value of the y_axis
-    if len(dump)>0:
-        if not dump[0]:
-            min_peaks.pop(0)
-        else:
-            pass    
+        #Remove the false hit on the first value of the y_axis
+        if len(dump)>0:
+            if not dump[0]:
+                min_peaks.pop(0)
+            else:
+                pass    
     
         #no peaks were found, should the function return empty lists?
 
@@ -544,8 +537,8 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         if (column + column_c) >= Image_width:
                             break
                         # check if the considered value is not zero, if so add the value to a sum and increase the count for later averaging
-                        if result[row-row_c][column+column_c] != 0:
-                            last_thickness+=  result[row-row_c][column+column_c]
+                        if result[row-row_c,column+column_c] != 0:
+                            last_thickness+=  result[row-row_c,column+column_c]
                             limit_counter += 1
 
                 # check if other values in the area were found
@@ -570,10 +563,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     current_thickness, current_index, sim_min_waves = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,last_index,thickness_list, thickness_limit))
                     # if a thickness was fitted, save it
                     if current_thickness != 0:
-                        result[row][column]=current_thickness
+                        result[row,column]=current_thickness
                         try:
                             len(sim_min_waves)
-                            error_map[row][column] = min(sim_min_waves[1])
+                            error_map[row,column] = min(sim_min_waves[1])
                         except TypeError:
                             pass  
                     
@@ -585,10 +578,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                             current_thickness, current_index, sim_min_waves = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, last_index, thickness_list,thickness_limit))
                             
                             if current_thickness != 0:
-                                result[row][column] = current_thickness
+                                result[row,column] = current_thickness
                                 try:
                                     len(sim_min_waves)
-                                    error_map[row][column] = min(sim_min_waves[1])
+                                    error_map[row,column] = min(sim_min_waves[1])
                                 except TypeError:
                                     pass
                                 break
@@ -597,10 +590,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                             current_thickness, current_index, sim_min_waves = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, last_index,thickness_list,thickness_limit))
                 
                             if current_thickness != 0:
-                                result[row][column] = current_thickness
+                                result[row,column] = current_thickness
                                 try:
                                     len(sim_min_waves)
-                                    error_map[row][column] = min(sim_min_waves[1])
+                                    error_map[row,column] = min(sim_min_waves[1])
                                 except TypeError:
                                     pass
                                 break
@@ -610,10 +603,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 # if there is still no thickness fitted, try to fit it without thickness limits
                 if current_thickness == 0:
                     current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index,thickness_list))
-                    result[row][column] = current_thickness
+                    result[row,column] = current_thickness
                     try:
                         len(sim_min_waves)
-                        error_map[row][column] = min(sim_min_waves[1])
+                        error_map[row,column] = min(sim_min_waves[1])
                     except TypeError:
                         pass
 
@@ -624,10 +617,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index, thickness_list))
                         
                         if current_thickness != 0:
-                            result[row][column] = current_thickness
+                            result[row,column] = current_thickness
                             try:
                                 len(sim_min_waves)
-                                error_map[row][column] = min(sim_min_waves[1])
+                                error_map[row,column] = min(sim_min_waves[1])
                             except TypeError:
                                 pass
                             break
@@ -635,10 +628,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index,thickness_list))
                         
                         if current_thickness != 0:
-                            result[row][column] = current_thickness
+                            result[row,column] = current_thickness
                             try:
                                 len(sim_min_waves)
-                                error_map[row][column] = min(sim_min_waves[1])
+                                error_map[row,column] = min(sim_min_waves[1])
                             except TypeError:
                                 pass
                             break
@@ -658,10 +651,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                 intensity = all_images[:,row, column]
                 minima_exp = np.array(peakdetect(intensity, waves, lookahead_min*enhance_resolution,lookahead_max*enhance_resolution, delta,enhance_resolution,average_window),dtype=np.float)
                 current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,current_index,thickness_list))
-                result[row][column] = current_thickness
+                result[row,column] = current_thickness
                 try:
                     len(sim_min_waves)
-                    error_map[row][column] = min(sim_min_waves[1])
+                    error_map[row,column] = min(sim_min_waves[1])
                 except TypeError:
                     pass   
 
@@ -672,10 +665,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         current_thickness, current_index, sim_min_waves  = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima, current_index, thickness_list))
                         
                         if current_thickness != 0:
-                            result[row][column] = current_thickness
+                            result[row,column] = current_thickness
                             try:
                                 len(sim_min_waves)
-                                error_map[row][column] = min(sim_min_waves[1])
+                                error_map[row,column] = min(sim_min_waves[1])
                             except TypeError:
                                 pass
                             break
@@ -683,10 +676,10 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         current_thickness, current_index, sim_min_waves = (Fit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,all_minima,current_index,thickness_list))
                         
                         if current_thickness != 0:
-                            result[row][column] = current_thickness
+                            result[row,column] = current_thickness
                             try:
                                 len(sim_min_waves)
-                                error_map[row][column] = min(sim_min_waves[1])
+                                error_map[row,column] = min(sim_min_waves[1])
                             except TypeError:
                                 pass
                             break

@@ -42,6 +42,7 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
     cdef unsigned int counter = 0
     cdef unsigned int position, len_block 
     cdef unsigned int thickness_temp, breaker = 0
+    cdef double value = 0
 
 
 
@@ -59,7 +60,8 @@ cdef Fit_limit(np.ndarray[DTYPE_t, ndim=1] thickness,np.ndarray[DTYPE_t3, ndim=1
         if len_block >0:
 
             for k in xrange(len_block): # can I just use the last minimum here? Do I actually have to????, hm, less points fitted....
-                summe_temp = _abs(sim_minima_blocks[position+k]-exp_wave) #_abs(sim_minima_blocks[position+k]-exp_wave)
+                value = sim_minima_blocks[position+k]
+                summe_temp = _abs(value-exp_wave) #_abs(sim_minima_blocks[position+k]-exp_wave)
 
                 if k == 0:
                     summe = summe_temp
@@ -122,7 +124,7 @@ cdef tuple peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, un
     #x_axis, y_axis = _datacheck_peakdetect(x_axis, y_axis) 
     
     # store data length for later use
-    cdef unsigned int length, x_min, x_i
+    cdef unsigned int length, x_min, x_i, min_index
 
     cdef np.ndarray[DTYPE_t, ndim=1] y_temp 
     #perform some checks
@@ -136,12 +138,12 @@ cdef tuple peakdetect(np.ndarray[DTYPE_t, ndim=1] y_axis, list x_axis = None, un
     cdef float mn = 100000
     cdef float mx = -100000
     cdef unsigned short index, window_len 
-    cdef float x, y, y_min, min_peak,wave_max
+    cdef float x, y, y_min, min_peak,wave_max, mnpos,mxpos
 
 
     fail = 0
 
-    length = len(y_axis)
+    length = np.size(y_axis)
 
     if minima_guess != 0:
 

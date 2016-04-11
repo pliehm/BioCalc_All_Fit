@@ -365,6 +365,7 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                         if thickness_ready[row-1,column-1] != 0:
                             last_thickness = thickness_ready[row-1,column-1]
 
+                # this will actually only run if the two cases before did not yield a thickness, maybe it should run always?
                 if last_thickness == 0:
 
                     # iterate over rows, distance from current row is 0 to area_avrg
@@ -429,12 +430,16 @@ def c_Fit_Pixel(unsigned int start,unsigned int ende, np.ndarray[DTYPE_t, ndim=3
                     
                 # only do the calculation if a minimum was found
                 if minima_exp != 0: 
+                    # add point to the current minima map
                     minima_ready[row,column] = minima_exp
+                    # calculate thickness
                     current_thickness = (Fit_limit(thickness,array_thickness_len_pos, array_length_block, minima_exp,tolerance,sim_minima_blocks,last_index,thickness_list, thickness_limit))
                             #if current_thickness != 0:
 
+                    # write thickness to array
                     thickness_ready[row,column] = current_thickness
 
+                # in case no minimum was found: assign the array a 0 or nan
                 else:
                     thickness_ready[row,column] = 0
                     minima_ready[row,column] = np.nan

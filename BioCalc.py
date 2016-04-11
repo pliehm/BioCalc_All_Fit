@@ -13,7 +13,7 @@
 # named "data". "data" is what you would enter in the list below. You can enter more then one folder 
 # in this list (e.g. for 3 different long-time measurements). But you can also run different instances of the program to make use of multiple cores.
 
-data = ['data']
+data = ['4_x=-51653.48, y=-36444.88','5_x=-51000.88, y=-36670.04','6_x=-51003.68, y=-37773.84','7_x=-51323.28, y=-38478.40','8_x=-50770.80, y=-38423.52','9_x=-50787.16, y=-39381.20']
 
 # enter name of simulation_file, copy and paste the file name of the
 # simulation file corresponding to your layer structure
@@ -30,8 +30,8 @@ tiff_stack = True
 
 # enter wavelength range of stack (only needed if tiff_stack = True)
 
-stack_wave_start = 550 # [nm]
-stack_wave_end = 750 # [nm]
+stack_wave_start = 650 # [nm]
+stack_wave_end = 690 # [nm]
 
 # enter a value to apply binning to run the calculation faster
 binning = 1
@@ -49,9 +49,10 @@ d_max= 10000 # [nm]
 # one minimum fit option --> only the last fitted minimum in the wavelength range will be considered and fitted
 
 one_minimum_fit = True
-# guess the thickness at a certain position
 
-init_guess = 7669#[500,500,7488] # [y,x] = [row,column,thickness], starting from 0 (row & column)
+# guess the thickness at a certain position. THIS HAS TO BE A LIST!!! e.g. [7500] or [7500,7800,7400]
+# the values have to correspond to the folders
+init_guess = [7653,7670,7632,7572,7605,7624] 
 
 
 # enter average allowed deviation of experiment to simulation in nanometer, "1" is a good value to start
@@ -67,7 +68,7 @@ lookahead_min = 5
 
 # set parameter for how many waves shall be interpolated b = 1, --> none, b=10 --> 0.1nm steps
 # 5 is a good value, 10 does not improve the result that much
-enhance_resolution = 10
+enhance_resolution = 5
 
 # average window, parameter which defines the window length for the smoothing: window_len = enhanced_resolution*average_window --> 1 equals 1 nm window
 
@@ -238,8 +239,11 @@ for thisline in string.split('\n'):
 #print list_all_minima_blocks[10]
 #quit()
 
+# counter which will be index for the data list to iterate folders and initial guesses at the same time
+folder_counter = 0
 # for every folder with images in the data folder do:
 for data_folder in data:
+
 
     # make a list of the wavelength images in the folder
     folder_list = os.listdir(data_folder)
@@ -358,24 +362,25 @@ for data_folder in data:
                 for i in range(len(stack[wave_start-stack_wave_start:wave_end-stack_wave_start+1])):
                     binned_stack[i]=transform.rescale(stack[i+(wave_start-stack_wave_start)],1.0/binning,preserve_range=True).round().astype(np.uint16)
 
+                # change name of stack
                 stack = binned_stack
                 #all_images = sp.ndimage.uniform_filter(sp.ndimage.interpolation.zoom(all_images, [((len(all_images)-1.0)*enhance_resolution+1)/len(all_images),1,1], order = 1),(enhance_resolution**2,0,0))
             
 
             if enhance_resolution != 1:
+                # time interpolation
                 test_time_1 = time.time()
                 
+                # if there is binning the iteration over the raw image stack has already been done
                 if binning != 1:
                     all_images = self_interpolate(stack,enhance_resolution)
                 else:
                     all_images = self_interpolate(stack[wave_start-stack_wave_start:wave_end-stack_wave_start+1],enhance_resolution)
-                #all_images = sp.ndimage.interpolation.zoom(all_images, [((wave_end-wave_start)/wave_step+1)/(wave_end-wave_start+1),1,1], order = 1)
-                #all_images = transform.resize(all_images,(len(all_images)*enhance_resolution-enhance_resolution + 1,Image_height,Image_width),order=1, preserve_range=True).round().astype(np.uint16)
+
                 test_time_2 = time.time()
                 print "interpolation takes: ", test_time_2-test_time_1
-                 #sys.exit("interpolation")
-                #all_images = sp.ndimage.uniform_filter(all_images,(enhance_resolution**2,0,0))
-                #all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
+
+                # more memory efficient but also much more time consuming, but necessary to avoid running out of memory
                 if save_ram == True:
                     for y in xrange(len(all_images[0])):
                         #print y
@@ -384,6 +389,8 @@ for data_folder in data:
                 else:
                     all_images = sp.ndimage.uniform_filter1d(all_images,axis=0,size=enhance_resolution**2)
                 print "smoothing takes: ", time.time()-test_time_2
+                
+            # case for no resolution enhancement
             else:
                 if binning != 1:
                     all_images = stack
@@ -454,7 +461,7 @@ for data_folder in data:
             if use_thickness_limits == True:
             
                 # call the external one minimum cython/c++ function with all the parameters
-                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess,average_window)
+                result = Fit_one.c_Fit_Pixel(start,ende,all_images, thickness_len_pos, waves, tolerance, lookahead_min*enhance_resolution, lookahead_max*enhance_resolution, delta,delta_vary,list_all_minima_blocks, use_thickness_limits, thickness_limit,area_avrg,init_guess[folder_counter],average_window)
             else:
                 print "\nERROR: You have to set: use_thickness_limits == True\n"
                 quit()
@@ -491,7 +498,7 @@ for data_folder in data:
         print 'write data to file'
         
         # generate a header with all parameters
-        HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'binning = ' + str(binning) + '\n' +  'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'enhance_resolution = ' + str(enhance_resolution) + '\n' +'average_window = '+ str(average_window) + '\n' + 'one_minimum_fit = ' + str(one_minimum_fit) + '\n' +'init_guess = ' + str(init_guess) + '\n' +'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' + 'area_avrg = ' +str(area_avrg) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
+        HEADER = time.strftime('Version = ' + version + '\n' + "%d.%m.%Y at %H:%M:%S")+'\n' + 'folder with data = ' + folder + '\n' + 'simulation file = ' + sim_file + '\n' + 'wave_start = '+str(wave_start) + '\n' + 'wave_end = ' + str(wave_end) + '\n' + 'binning = ' + str(binning) + '\n' +  'lookahead_min = ' + str(lookahead_min) + '\n'  + 'lookahead_max = ' + str(lookahead_max) + '\n' + 'delta = ' + str(delta) + ' delta was varied +-'+str(delta_vary*5)+ '\n' + 'tolerance = ' + str(tolerance) + '\n' + 'enhance_resolution = ' + str(enhance_resolution) + '\n' +'average_window = '+ str(average_window) + '\n' + 'one_minimum_fit = ' + str(one_minimum_fit) + '\n' +'init_guess = ' + str(init_guess[folder_counter]) + '\n' +'thickness limits used: ' + str(use_thickness_limits) + '\n' + 'thickness limits: ' + str(thickness_limit) + '\n' + 'area_avrg = ' +str(area_avrg) + '\n' + 'not fitted values: ' + str(not_fitted) + ', percentage of whole image: ' + str(not_fitted_percent)  + '\n'
 
         HEADER+= '\n'
 
@@ -541,3 +548,5 @@ for data_folder in data:
     p.write(HEADER)
     p.close()
 
+    # increase folder_counter
+    folder_counter += 1
